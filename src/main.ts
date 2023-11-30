@@ -37,22 +37,22 @@ const renderLoop = (prevTime: number, currentTime: number) => {
 const eventListener = (e: KeyboardEvent) => {
   switch (e.key) {
     case "w":
-      player.foward(0.5);
+      player.surgeStep(0.5);
       break;
     case "s":
-      player.backward(0.5);
-      break;
-    case "a":
-      player.translateX(-0.5);
+      player.surgeStep(-0.5);
       break;
     case "d":
-      player.translateX(0.5);
+      player.swayStep(0.5);
+      break;
+    case "a":
+      player.swayStep(-0.5);
       break;
     case "ArrowLeft":
-      player.rotateY(-0.05);
+      player.yawStep(-0.05);
       break;
     case "ArrowRight":
-      player.rotateY(0.05);
+      player.yawStep(0.05);
       break;
   }
 };

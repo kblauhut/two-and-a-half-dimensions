@@ -7,25 +7,17 @@ export class Player {
   public x = 0;
   public y = 0;
 
-  public rotateY(angle: number) {
+  public yawStep(angle: number) {
     this.yaw += angle;
   }
 
-  public foward(step: number) {
+  public surgeStep(step: number) {
     this.x += cos(this.yaw) * step;
     this.y += sin(this.yaw) * step;
   }
 
-  public backward(step: number) {
-    this.x -= cos(this.yaw) * step;
-    this.y -= sin(this.yaw) * step;
-  }
-
-  public translateX(x: number) {
-    this.x += x;
-  }
-
-  public translateY(y: number) {
-    this.y += y;
+  public swayStep(step: number) {
+    this.x += cos(this.yaw + Math.PI / 2) * step;
+    this.y += sin(this.yaw + Math.PI / 2) * step;
   }
 }
