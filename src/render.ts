@@ -47,7 +47,6 @@ export const renderFrame = (
   ctx.fillStyle = "pink";
   ctx.fillRect(0, 0, WIDTH, HEIGHT);
 
-  ctx.fillStyle = "red";
   const drawingWallPoints: number[][] = []; // Debug
 
   // Build the view frustum
@@ -181,6 +180,18 @@ export const renderFrame = (
           1
         )
       );
+
+      const wallAngle = Math.acos(
+        minMax(
+          (dot(toUnit(vertexA), toUnit(vertexB)) /
+            Number(norm(toUnit(vertexA)))) *
+            Number(norm(toUnit(vertexB))),
+          -1,
+          1
+        )
+      );
+
+      ctx.fillStyle = `hsl(${wallAngle * 100}, 100%, 50%)`;
 
       const leftWallPointX = (leftWallPointAngle / FOV_RAD) * WIDTH;
       const rightWallPointX = (rightWallPointAngle / FOV_RAD) * WIDTH;
