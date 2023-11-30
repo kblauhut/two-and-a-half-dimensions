@@ -44,7 +44,7 @@ export const renderFrame = (
   } = config;
   const ASPECT_RATIO = WIDTH / HEIGHT;
 
-  ctx.fillStyle = "pink";
+  ctx.fillStyle = "gray";
   ctx.fillRect(0, 0, WIDTH, HEIGHT);
 
   const drawingWallPoints: number[][] = []; // Debug
@@ -192,6 +192,7 @@ export const renderFrame = (
       );
 
       ctx.fillStyle = `hsl(${wallAngle * 100}, 100%, 50%)`;
+      ctx.strokeStyle = `hsl(${wallAngle * 100}, 100%, 20%)`;
 
       const leftWallPointX = (leftWallPointAngle / FOV_RAD) * WIDTH;
       const rightWallPointX = (rightWallPointAngle / FOV_RAD) * WIDTH;
