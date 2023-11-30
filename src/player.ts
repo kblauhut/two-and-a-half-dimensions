@@ -3,7 +3,7 @@ import { cos, sin } from "mathjs";
 export class Player {
   constructor() {}
 
-  public yaw = (-90 * Math.PI) / 180;
+  public yaw = 0;
   public x = 0;
   public y = 0;
 

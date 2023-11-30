@@ -13,10 +13,14 @@ import {
 } from "mathjs";
 
 const convexShape = [
-  [30, 10],
-  [0, 40],
-  [-30, 10],
-  [30, 10],
+  [-20.6038271383113, 15.242158914828],
+  [-26.5464397239003, -0.2086338077036],
+  [-18.0286950178894, -19.4230811677749],
+  [16.0422838061545, -13.2823814959995],
+  [20.4001997022531, 14.6478976562691],
+  [2.9685361178586, 22.1752069313485],
+  [-12.0860824323003, 52.2844440316665],
+  [-20.6038271383113, 15.242158914828],
 ];
 
 type RenderConfig = {
@@ -38,6 +42,7 @@ export const renderFrame = (
     fovRad: FOV_RAD,
     viewDistance: VIEW_DISTANCE,
   } = config;
+  const ASPECT_RATIO = WIDTH / HEIGHT;
 
   ctx.fillStyle = "pink";
   ctx.fillRect(0, 0, WIDTH, HEIGHT);
@@ -59,10 +64,12 @@ export const renderFrame = (
 
   const playerPosition = [player.x, player.y];
 
-  const walls = convexShape.map((vertex, index) => {
-    const nextVertex = convexShape[index + 1] || convexShape[0];
-    return [vertex, nextVertex];
-  });
+  const walls: number[][][] = [];
+  for (const [index, vertex] of convexShape.entries()) {
+    const prevVertex = convexShape[index - 1];
+    if (!prevVertex) continue;
+    walls.push([prevVertex, vertex]);
+  }
 
   // draw room
   for (const wall of walls) {
@@ -118,21 +125,16 @@ export const renderFrame = (
         : vertexB;
 
       // Continue if the wall is not visible
-      // TODO: This is not working correctly
-      // This is a stupid test becuase there can be a wall with no direct frustum intersection that is still visible
-      // Maybe triangle hit test?
-      if (
-        !isPointOnLine(
-          playerPosition,
-          add(playerPosition, scaleVector(frustumLeft, VIEW_DISTANCE)),
-          leftWallPoint
-        ) &&
-        !isPointOnLine(
-          playerPosition,
-          add(playerPosition, scaleVector(frustumRight, VIEW_DISTANCE)),
-          rightWallPoint
-        )
-      ) {
+      const dotLeft = dot(
+        cameraVector,
+        toUnit(subtract(leftWallPoint, playerPosition))
+      );
+      const dotRight = dot(
+        cameraVector,
+        toUnit(subtract(rightWallPoint, playerPosition))
+      );
+
+      if (dotLeft < 0 || dotRight < 0) {
         continue;
       }
 
@@ -142,11 +144,12 @@ export const renderFrame = (
       const leftWallPointDistance = Number(
         distance(leftWallPoint, playerPosition)
       );
-      const leftWallPointHeight = HEIGHT / leftWallPointDistance;
+      const leftWallPointHeight = HEIGHT / ASPECT_RATIO / leftWallPointDistance;
       const rightWallPointDistance = Number(
         distance(rightWallPoint, playerPosition)
       );
-      const rightWallPointHeight = HEIGHT / rightWallPointDistance;
+      const rightWallPointHeight =
+        HEIGHT / ASPECT_RATIO / rightWallPointDistance;
 
       // Calculate the where on the screen the wall should be drawn
       // We project the wall to the camera vector and calculate the angle
@@ -237,7 +240,6 @@ export const renderFrame = (
     ctx.lineTo(vertexB[0] + 48, vertexB[1] + 48);
   }
 
-  ctx.lineTo(convexShape[0][0] + 48, convexShape[0][1] + 48);
   ctx.stroke();
 
   ctx.fillStyle = "green";
