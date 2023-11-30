@@ -1,6 +1,6 @@
 import { Player } from "./player";
 import { minMax, scaleVector, toUnit } from "./math";
-import { isPointOnLine } from "./intersect";
+import { isPointInFrustum, isPointOnLine } from "./intersect";
 import {
   sin,
   cos,
@@ -51,6 +51,7 @@ export const renderFrame = (
 
   // Build the view frustum
   const cameraVector = [cos(player.yaw), sin(player.yaw)];
+
   const frustumLeft = [
     cos(player.yaw - FOV_RAD / 2),
     sin(player.yaw - FOV_RAD / 2),
@@ -123,17 +124,18 @@ export const renderFrame = (
         ? intersectionRightFrustum
         : vertexB;
 
-      // Continue if the wall is not visible
-      const dotLeft = dot(
-        cameraVector,
-        toUnit(subtract(leftWallPoint, playerPosition))
-      );
-      const dotRight = dot(
-        cameraVector,
-        toUnit(subtract(rightWallPoint, playerPosition))
-      );
-
-      if (dotLeft < 0 || dotRight < 0) {
+      if (
+        !isPointInFrustum(
+          frustumLeft,
+          frustumRight,
+          subtract(leftWallPoint, playerPosition)
+        ) &&
+        !isPointInFrustum(
+          frustumLeft,
+          frustumRight,
+          subtract(rightWallPoint, playerPosition)
+        )
+      ) {
         continue;
       }
 

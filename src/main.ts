@@ -49,10 +49,10 @@ const eventListener = (e: KeyboardEvent) => {
       player.swayStep(-0.5);
       break;
     case "ArrowLeft":
-      player.yawStep(-0.05);
+      player.yawStep(-0.1);
       break;
     case "ArrowRight":
-      player.yawStep(0.05);
+      player.yawStep(0.1);
       break;
   }
 };

@@ -1,4 +1,4 @@
-import { distance } from "mathjs";
+import { distance, dot } from "mathjs";
 
 export const isPointOnLine = (
   lineVectorA: number[],
@@ -10,4 +10,20 @@ export const isPointOnLine = (
   const aToB = Number(distance(lineVectorA, lineVectorB));
 
   return aToPoint + bToPoint - aToB < 0.005;
+};
+
+// Create perpendicular vectors from the frustum vectors
+// We can then use the dot product to determine if a point is in the frustum
+export const isPointInFrustum = (
+  leftFrustum: number[],
+  rightFrustum: number[],
+  point: number[]
+) => {
+  const leftFrustumPerpendicular = [-leftFrustum[1], leftFrustum[0]];
+  const rightFrustumPerpendicular = [rightFrustum[1], -rightFrustum[0]];
+
+  const dotLeft = dot(leftFrustumPerpendicular, point);
+  const dotRight = dot(rightFrustumPerpendicular, point);
+
+  return dotLeft > 0.005 && dotRight > 0.005;
 };
