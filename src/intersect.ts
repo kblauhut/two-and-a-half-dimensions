@@ -27,3 +27,18 @@ export const isPointInFrustum = (
 
   return dotLeft > 0.005 && dotRight > 0.005;
 };
+
+export const isLineInFrustum = (
+  leftFrustum: number[],
+  rightFrustum: number[],
+  pointA: number[],
+  pointB: number[]
+) => {
+  const leftFrustumPerpendicular = [-leftFrustum[1], leftFrustum[0]];
+  const rightFrustumPerpendicular = [rightFrustum[1], -rightFrustum[0]];
+
+  const dotARight = dot(rightFrustumPerpendicular, pointA);
+  const dotBLeft = dot(leftFrustumPerpendicular, pointB);
+
+  return dotARight > 0.005 && dotBLeft > 0.005;
+};

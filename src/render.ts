@@ -1,6 +1,6 @@
 import { Player } from "./player";
 import { minMax, scaleVector, toUnit } from "./math";
-import { isPointInFrustum, isPointOnLine } from "./intersect";
+import { isLineInFrustum, isPointOnLine } from "./intersect";
 import {
   sin,
   cos,
@@ -125,14 +125,10 @@ export const renderFrame = (
         : vertexB;
 
       if (
-        !isPointInFrustum(
+        !isLineInFrustum(
           frustumLeft,
           frustumRight,
-          subtract(leftWallPoint, playerPosition)
-        ) &&
-        !isPointInFrustum(
-          frustumLeft,
-          frustumRight,
+          subtract(leftWallPoint, playerPosition),
           subtract(rightWallPoint, playerPosition)
         )
       ) {
