@@ -6,6 +6,7 @@ export class Player {
   public yaw = 0;
   public x = 0;
   public y = 0;
+  public z = 1;
 
   public yawStep(angle: number) {
     this.yaw += angle;
