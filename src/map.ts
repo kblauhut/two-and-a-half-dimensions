@@ -19,7 +19,7 @@ export const MAP: Sector[] = [
       [-12.0860824323003, 52.2844440316665],
       [-20.6038271383113, 15.242158914828],
     ],
-    height: 10,
+    height: 8,
     bottomOffset: 0,
     neighbourIds: [],
   },

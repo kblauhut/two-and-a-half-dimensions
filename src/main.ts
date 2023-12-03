@@ -54,6 +54,12 @@ const eventListener = (e: KeyboardEvent) => {
     case "ArrowRight":
       player.yawStep(0.1);
       break;
+    case "ArrowUp":
+      player.heaveStep(0.5);
+      break;
+    case "ArrowDown":
+      player.heaveStep(-0.5);
+      break;
   }
 };
 

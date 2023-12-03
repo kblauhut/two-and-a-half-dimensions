@@ -21,4 +21,8 @@ export class Player {
     this.x += cos(this.yaw + Math.PI / 2) * step;
     this.y += sin(this.yaw + Math.PI / 2) * step;
   }
+
+  public heaveStep(step: number) {
+    this.z += step;
+  }
 }

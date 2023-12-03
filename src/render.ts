@@ -1,7 +1,8 @@
 import { Player } from "./player";
-import { minMax, scaleVector, vectorAngle } from "./math";
+import { minMax, radiansToDegrees, scaleVector, vectorAngle } from "./math";
 import { isLineInFrustum, isPointOnLine } from "./intersect";
 import { Sector, MAP } from "./map";
+import { getWallPointScreenOffsets } from "./render.helper";
 import { sin, cos, intersect, distance, subtract, add } from "mathjs";
 
 const MAX_PORTAL_RENDERS = 32;
@@ -218,14 +219,28 @@ const renderPortal = (
       distance(rightWallPoint, playerPosition)
     );
 
-    const leftWallPointHeight = HEIGHT / ASPECT_RATIO / leftWallPointDistance;
-
-    const rightWallPointHeight = HEIGHT / ASPECT_RATIO / rightWallPointDistance;
-
     // Calculate the where on the screen the wall should be drawn
-    // We project the wall to the camera vector and calculate the angle
     const leftWallPointAtPlayer = subtract(leftWallPoint, playerPosition);
     const rightWallPointAtPlayer = subtract(rightWallPoint, playerPosition);
+
+    // Calculate at which vertical angle the start/end pint of the wall exists
+    const [leftWallBottomOffset, leftWallTopOffset] = getWallPointScreenOffsets(
+      leftWallPointDistance,
+      sector.bottomOffset,
+      sector.height,
+      verticalFov,
+      player.z,
+      HEIGHT
+    );
+    const [rightWallBottomOffset, rightWallTopOffset] =
+      getWallPointScreenOffsets(
+        rightWallPointDistance,
+        sector.bottomOffset,
+        sector.height,
+        verticalFov,
+        player.z,
+        HEIGHT
+      );
 
     const leftWallPointAngle = vectorAngle(frustumLeft, leftWallPointAtPlayer);
     const rightWallPointAngle = vectorAngle(
@@ -243,12 +258,22 @@ const renderPortal = (
 
     // Draw the wall
     ctx.beginPath();
-    ctx.moveTo(leftWallPointX, HEIGHT / 2 - leftWallPointHeight);
-    ctx.lineTo(leftWallPointX, HEIGHT / 2 + leftWallPointHeight);
-    ctx.lineTo(rightWallPointX, HEIGHT / 2 + rightWallPointHeight);
-    ctx.lineTo(rightWallPointX, HEIGHT / 2 - rightWallPointHeight);
-    ctx.lineTo(leftWallPointX, HEIGHT / 2 - leftWallPointHeight);
+    ctx.moveTo(leftWallPointX, leftWallBottomOffset);
+    ctx.lineTo(leftWallPointX, leftWallTopOffset);
+    ctx.lineTo(rightWallPointX, rightWallTopOffset);
+    ctx.lineTo(rightWallPointX, rightWallBottomOffset);
+    ctx.lineTo(leftWallPointX, leftWallBottomOffset);
     ctx.fill();
     ctx.stroke();
+
+    ctx.fillStyle = `darkgray`;
+
+    ctx.beginPath();
+    ctx.moveTo(leftWallPointX, leftWallBottomOffset);
+    ctx.lineTo(leftWallPointX, HEIGHT);
+    ctx.lineTo(rightWallPointX, HEIGHT);
+    ctx.lineTo(rightWallPointX, rightWallBottomOffset);
+    ctx.moveTo(leftWallPointX, leftWallBottomOffset);
+    ctx.fill();
   }
 };
