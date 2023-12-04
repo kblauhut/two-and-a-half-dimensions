@@ -1,4 +1,4 @@
-import { distance, dot } from "mathjs";
+import { distance, dot, intersect } from "mathjs";
 
 export const isPointOnLine = (
   lineVectorA: number[],
@@ -10,6 +10,30 @@ export const isPointOnLine = (
   const aToB = Number(distance(lineVectorA, lineVectorB));
 
   return aToPoint + bToPoint - aToB < 0.005;
+};
+
+export const getLineSegmentIntersection = (
+  lineAStart: number[],
+  lineAEnd: number[],
+  lineBStart: number[],
+  lineBEnd: number[]
+) => {
+  const intersectionPoint = intersect(
+    lineAStart,
+    lineAEnd,
+    lineBStart,
+    lineBEnd
+  ) as number[] | null;
+
+  if (!intersectionPoint) return null;
+
+  // We also need to check if the intersection point is on the line segments
+  const isOnLineA = isPointOnLine(lineAStart, lineAEnd, intersectionPoint);
+  const isOnLineB = isPointOnLine(lineBStart, lineBEnd, intersectionPoint);
+
+  if (!isOnLineA || !isOnLineB) return null;
+
+  return intersectionPoint;
 };
 
 // Create perpendicular vectors from the frustum vectors

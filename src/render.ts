@@ -1,6 +1,10 @@
 import { Player } from "./player";
-import { minMax, radiansToDegrees, scaleVector, vectorAngle } from "./math";
-import { isLineInFrustum, isPointOnLine } from "./intersect";
+import { scaleVector, vectorAngle } from "./math";
+import {
+  isLineInFrustum,
+  isPointOnLine,
+  getLineSegmentIntersection,
+} from "./intersect";
 import { Sector, MAP } from "./map";
 import { getWallPointScreenOffsets } from "./render.helper";
 import { sin, cos, intersect, distance, subtract, add } from "mathjs";
@@ -45,19 +49,13 @@ export const renderFrame = (
   ];
 
   const playerPosition = [player.x, player.y];
-  const playerSector = MAP[0]; // TODO: Calculate this - possibly cache the last value so we alywas check it first
 
-  const walls: number[][][] = [];
-  for (const [index, vertex] of playerSector.vertices.entries()) {
-    const prevVertex = playerSector.vertices[index - 1];
-    if (!prevVertex) continue;
-    walls.push([prevVertex, vertex]);
-  }
-
+  const renderedSectorIds: number[] = [];
   let renderedPortals = 0;
+
   const portalQueue: Portal[] = [
     {
-      sector: playerSector,
+      sector: MAP[0], // TODO: Calculate this - possibly cache the last value so we alywas check it first
       frustumLeft,
       frustumRight,
     },
@@ -67,6 +65,17 @@ export const renderFrame = (
     const portal = portalQueue.pop()!;
     renderPortal(config, player, portal, ctx);
     renderedPortals++;
+    renderedSectorIds.push(portal.sector.id);
+    // portal.sector.neighbourIds.forEach((neighbourId) => {
+    //   if (renderedSectorIds.includes(neighbourId)) return;
+    //   const neighbourSector = MAP.find((sector) => sector.id === neighbourId)!;
+    //   const neighbourPortal = {
+    //     sector: neighbourSector,
+    //     frustumLeft: portal.frustumLeft,
+    //     frustumRight: portal.frustumRight,
+    //   };
+    //   portalQueue.push(neighbourPortal);
+    // });
   }
 
   // Mini map for debugging
@@ -103,16 +112,26 @@ export const renderFrame = (
   );
   ctx.stroke();
 
-  ctx.strokeStyle = "blue";
-  ctx.beginPath();
+  for (const sectorId of renderedSectorIds) {
+    const sector = MAP.find((sector) => sector.id === sectorId)!;
 
-  for (const wall of walls) {
-    const [vertexA, vertexB] = wall;
-    ctx.moveTo(vertexA[0] + 48, vertexA[1] + 48);
-    ctx.lineTo(vertexB[0] + 48, vertexB[1] + 48);
+    const walls: number[][][] = [];
+    for (const [index, vertex] of sector.vertices.entries()) {
+      const prevVertex = sector.vertices[index - 1];
+      if (!prevVertex) continue;
+      walls.push([prevVertex, vertex]);
+    }
+
+    ctx.strokeStyle = "blue";
+    ctx.beginPath();
+
+    for (const wall of walls) {
+      const [vertexA, vertexB] = wall;
+      ctx.moveTo(vertexA[0] + 48, vertexA[1] + 48);
+      ctx.lineTo(vertexB[0] + 48, vertexB[1] + 48);
+    }
+    ctx.stroke();
   }
-
-  ctx.stroke();
 
   // ctx.fillStyle = "green";
   // for (const wallPoint of drawingWallPoints) {
@@ -147,58 +166,27 @@ const renderPortal = (
   }
 
   // draw room
-  for (const wall of walls) {
+  for (const [index, wall] of walls.entries()) {
+    // const wallPortal =
+    //   sector.portalWallsIndices.includes(index) &&
+    //   MAP.find((sector) => sector.id === portal.sector.neighbourIds[0]); // TODO this is retard code
     const [vertexA, vertexB] = wall;
 
-    // Check intersection with the left side of frustum
-    const intersectionLeftFrustum = intersect(
-      playerPosition,
-      add(frustumLeft, playerPosition),
-      vertexA,
-      vertexB
-    ) as number[];
-    if (!intersectionLeftFrustum) continue; // Ignore this wall, its parallel to the left side of the frustum
-
-    const isOnLeftFrustumLine = isPointOnLine(
+    const intersectionLeftFrustum = getLineSegmentIntersection(
       playerPosition,
       add(playerPosition, scaleVector(frustumLeft, VIEW_DISTANCE)),
-      intersectionLeftFrustum
-    );
-    const clipFromLeft = isPointOnLine(
-      vertexA,
-      vertexB,
-      intersectionLeftFrustum
-    );
-    const leftWallPoint = !isOnLeftFrustumLine
-      ? vertexA
-      : clipFromLeft
-      ? intersectionLeftFrustum
-      : vertexA;
-
-    // Check intersection with the right side of frustum
-    const intersectionRightFrustum = intersect(
-      playerPosition,
-      add(frustumRight, playerPosition),
       vertexA,
       vertexB
-    ) as number[];
-    if (!intersectionRightFrustum) continue; // Ignore this wall, its parallel to the right side of the frustum
-
-    const isOnRightFrustumLine = isPointOnLine(
+    );
+    const intersectionRightFrustum = getLineSegmentIntersection(
       playerPosition,
       add(playerPosition, scaleVector(frustumRight, VIEW_DISTANCE)),
-      intersectionRightFrustum
-    );
-    const clipFromRight = isPointOnLine(
       vertexA,
-      vertexB,
-      intersectionRightFrustum
+      vertexB
     );
-    const rightWallPoint = !isOnRightFrustumLine
-      ? vertexB
-      : clipFromRight
-      ? intersectionRightFrustum
-      : vertexB;
+
+    const leftWallPoint = intersectionLeftFrustum || vertexA;
+    const rightWallPoint = intersectionRightFrustum || vertexB;
 
     if (
       !isLineInFrustum(
@@ -211,19 +199,10 @@ const renderPortal = (
       continue;
     }
 
-    // Calculate wall heights
+    // Calculate at which vertical angle the start/end pint of the wall exists
     const leftWallPointDistance = Number(
       distance(leftWallPoint, playerPosition)
     );
-    const rightWallPointDistance = Number(
-      distance(rightWallPoint, playerPosition)
-    );
-
-    // Calculate the where on the screen the wall should be drawn
-    const leftWallPointAtPlayer = subtract(leftWallPoint, playerPosition);
-    const rightWallPointAtPlayer = subtract(rightWallPoint, playerPosition);
-
-    // Calculate at which vertical angle the start/end pint of the wall exists
     const [leftWallBottomOffset, leftWallTopOffset] = getWallPointScreenOffsets(
       leftWallPointDistance,
       sector.bottomOffset,
@@ -231,6 +210,10 @@ const renderPortal = (
       verticalFov,
       player.z,
       HEIGHT
+    );
+
+    const rightWallPointDistance = Number(
+      distance(rightWallPoint, playerPosition)
     );
     const [rightWallBottomOffset, rightWallTopOffset] =
       getWallPointScreenOffsets(
@@ -242,10 +225,14 @@ const renderPortal = (
         HEIGHT
       );
 
-    const leftWallPointAngle = vectorAngle(frustumLeft, leftWallPointAtPlayer);
+    // Calculate the where on the screen the wall should be drawn
+    const leftWallPointAngle = vectorAngle(
+      frustumLeft,
+      subtract(leftWallPoint, playerPosition)
+    );
     const rightWallPointAngle = vectorAngle(
       frustumLeft,
-      rightWallPointAtPlayer
+      subtract(rightWallPoint, playerPosition)
     );
 
     const wallAngle = vectorAngle(vertexA, vertexB);
@@ -266,8 +253,7 @@ const renderPortal = (
     ctx.fill();
     ctx.stroke();
 
-    ctx.fillStyle = `darkgray`;
-
+    ctx.fillStyle = `hsl(0, 0%, ${(sector.bottomOffset + 3) * 10}%)`;
     ctx.beginPath();
     ctx.moveTo(leftWallPointX, leftWallBottomOffset);
     ctx.lineTo(leftWallPointX, HEIGHT);

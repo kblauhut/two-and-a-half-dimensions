@@ -4,6 +4,7 @@ export type Sector = {
   height: number;
   bottomOffset: number;
   neighbourIds: number[];
+  portalWallsIndices: number[];
 };
 
 export const MAP: Sector[] = [
@@ -21,6 +22,21 @@ export const MAP: Sector[] = [
     ],
     height: 8,
     bottomOffset: 0,
-    neighbourIds: [],
+    neighbourIds: [1],
+    portalWallsIndices: [0],
+  },
+  {
+    id: 1,
+    vertices: [
+      [-20.6038271383113, 15.242158914828],
+      [-45, 25],
+      [-45, 10],
+      [-26.5464397239003, -0.2086338077036],
+      [-20.6038271383113, 15.242158914828],
+    ],
+    height: 6,
+    bottomOffset: 1,
+    neighbourIds: [0],
+    portalWallsIndices: [3],
   },
 ];
