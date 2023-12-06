@@ -42,3 +42,50 @@ export const isLineInFrustum = (
 
   return dotARight > 0.005 && dotBLeft > 0.005;
 };
+
+
+
+
+
+export const calculatePlayerBoundingBox = (
+  playerPosition: number[],
+  playerYaw: number,
+  width: number,
+  height: number
+) => {
+  // Hilfsfunktion, um einen Punkt um einen bestimmten Punkt zu drehen
+  function rotatePoint(point: number[], angle: number, center: number[]): number[] {
+    const cosA = Math.cos(angle);
+    const sinA = Math.sin(angle);
+    // Punkt relativ zum Zentrum verschieben
+    const translatedPoint = [point[0] - center[0], point[1] - center[1]];
+    // Punkt drehen
+    const rotatedPoint = [
+      translatedPoint[0] * cosA - translatedPoint[1] * sinA,
+      translatedPoint[0] * sinA + translatedPoint[1] * cosA
+    ];
+    // Punkt zurück zum Zentrum verschieben
+    return [rotatedPoint[0] + center[0], rotatedPoint[1] + center[1]];
+  }
+
+  const center = playerPosition;
+  const corners = {
+    nw: [center[0] - width / 2, center[1] - height / 2],
+    ne: [center[0] + width / 2, center[1] - height / 2],
+    se: [center[0] + width / 2, center[1] + height / 2],
+    sw: [center[0] - width / 2, center[1] + height / 2]
+  };
+
+  // Ecken um den Spieler drehen
+  return {
+    nw: rotatePoint(corners.nw, playerYaw, center),
+    ne: rotatePoint(corners.ne, playerYaw, center),
+    se: rotatePoint(corners.se, playerYaw, center),
+    sw: rotatePoint(corners.sw, playerYaw, center)
+  };
+};
+
+
+
+
+

@@ -1,6 +1,6 @@
 import { Player } from "./player";
 import { minMax, radiansToDegrees, scaleVector, vectorAngle } from "./math";
-import { isLineInFrustum, isPointOnLine } from "./intersect";
+import { calculatePlayerBoundingBox, isLineInFrustum, isPointOnLine } from "./intersect";
 import { Sector, MAP } from "./map";
 import { getWallPointScreenOffsets } from "./render.helper";
 import { sin, cos, intersect, distance, subtract, add } from "mathjs";
@@ -71,7 +71,7 @@ export const renderFrame = (
 
   // Mini map for debugging
   ctx.fillStyle = "white";
-  ctx.fillRect(player.x + 48, player.y + 48, 4, 4);
+  ctx.fillRect(player.x + 46, player.y + 46, 4, 4);
   ctx.fillStyle = "red";
   ctx.fillRect(
     add(playerPosition, scaleVector(cameraVector, 40))[0] + 48,
@@ -79,6 +79,19 @@ export const renderFrame = (
     2,
     2
   );
+
+  const playerBox = calculatePlayerBoundingBox(playerPosition, player.yaw, 10, 10);
+  //Bounding Box
+  ctx.strokeStyle = 'red';
+  ctx.beginPath();
+  ctx.moveTo(playerBox.nw[0] + 48, playerBox.nw[1] + 48);
+  ctx.lineTo(playerBox.ne[0] + 48, playerBox.ne[1] + 48);
+  ctx.lineTo(playerBox.se[0] + 48, playerBox.se[1] + 48);
+  ctx.lineTo(playerBox.sw[0] + 48, playerBox.sw[1] + 48);
+  ctx.closePath();
+  ctx.stroke();
+
+
   // Draw frustum
   ctx.strokeStyle = "yellow";
   ctx.beginPath();
