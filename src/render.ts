@@ -79,9 +79,11 @@ export const renderFrame = (
     2,
     2
   );
+  
 
+
+  //Bounding Box Mini map
   const playerBox = calculatePlayerBoundingBox(playerPosition, player.yaw, 10, 10);
-  //Bounding Box
   ctx.strokeStyle = 'red';
   ctx.beginPath();
   ctx.moveTo(playerBox.nw[0] + 48, playerBox.nw[1] + 48);

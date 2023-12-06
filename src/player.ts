@@ -41,6 +41,8 @@ export class Player {
   public heaveStep(step: number) {
     this.z += step;
   }
+
+  //Mal schauenob man das irgendwann nochmal brauch
   /*
   private isVertexInsideBoundingBox(vertex: number[], playerBox: {ne: number[], sw: number[], nw: number[], se: number[]}) {
     const x = vertex[0];
@@ -91,7 +93,7 @@ export class Player {
     return false;
   }
 
-
+  //Bewegungs Bedingung
   private canMove(newX: number, newY: number) {
     const playerBox = calculatePlayerBoundingBox([newX, newY], this.yaw, 10, 10);
     const vertices = MAP[0].vertices;
