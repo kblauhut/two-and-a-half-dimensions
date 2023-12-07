@@ -79,6 +79,7 @@ export const renderFrame = (
     2,
     2
   );
+  
 
   const playerBox = calculatePlayerBoundingBox(playerPosition, player.yaw);
   //Bounding Box

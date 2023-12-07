@@ -43,10 +43,7 @@ export const isLineInFrustum = (
   return dotARight > 0.005 && dotBLeft > 0.005;
 };
 
-
-
-
-
+//Bounding Box for Player (TODO)
 export const calculatePlayerBoundingBox = (
   playerPosition: number[],
   playerYaw: number,
