@@ -80,7 +80,7 @@ export const renderFrame = (
     2
   );
 
-  const playerBox = calculatePlayerBoundingBox(playerPosition, player.yaw, 10, 10);
+  const playerBox = calculatePlayerBoundingBox(playerPosition, player.yaw);
   //Bounding Box
   ctx.strokeStyle = 'red';
   ctx.beginPath();
