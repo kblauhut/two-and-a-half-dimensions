@@ -1,11 +1,12 @@
 import { Player } from "./player";
 import { renderFrame } from "./render";
 
-const HEIGHT = 600;
-const WIDTH = 800;
+const HEIGHT = 800;
+const WIDTH = 1400;
 const FOV = 90;
 const FOV_RAD = (FOV * Math.PI) / 180;
 const VIEW_DISTANCE = 10000;
+const RENDER_BUFFER = new Uint32Array(WIDTH * HEIGHT);
 
 const canvas = document.getElementById("render-canvas") as HTMLCanvasElement;
 canvas.width = WIDTH;
@@ -22,6 +23,7 @@ const renderConfig = {
   width: WIDTH,
   fovRad: FOV_RAD,
   viewDistance: VIEW_DISTANCE,
+  renderBuffer: RENDER_BUFFER,
 };
 
 const player = new Player();

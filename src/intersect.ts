@@ -66,3 +66,21 @@ export const isLineInFrustum = (
 
   return dotARight > 0.005 && dotBLeft > 0.005;
 };
+
+// TODO: Learn how this works https://observablehq.com/@tmcw/understanding-point-in-polygon
+export const isPointInPolygon = (polygon: number[][], point: number[]) => {
+  let inside = false;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const xi = polygon[i][0];
+    const yi = polygon[i][1];
+    const xj = polygon[j][0];
+    const yj = polygon[j][1];
+
+    const intersect =
+      yi > point[1] !== yj > point[1] &&
+      point[0] < ((xj - xi) * (point[1] - yi)) / (yj - yi) + xi;
+    if (intersect) inside = !inside;
+  }
+
+  return inside;
+};

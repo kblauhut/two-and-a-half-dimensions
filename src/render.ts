@@ -2,12 +2,13 @@ import { Player } from "./player";
 import { scaleVector, vectorAngle } from "./math";
 import {
   isLineInFrustum,
-  isPointOnLine,
   getLineSegmentIntersection,
+  isPointInPolygon,
 } from "./intersect";
 import { Sector, MAP } from "./map";
 import { getWallPointScreenOffsets } from "./render.helper";
-import { sin, cos, intersect, distance, subtract, add } from "mathjs";
+import { sin, cos, distance, subtract, add, dot } from "mathjs";
+import { rasterizeParallelogramInBounds, rgbColor } from "./rasterize";
 
 const MAX_PORTAL_RENDERS = 32;
 
@@ -16,67 +17,72 @@ type RenderConfig = {
   width: number;
   fovRad: number;
   viewDistance: number;
+  renderBuffer: Uint32Array;
 };
 
 type Portal = {
   sector: Sector;
+  previousSectorId: number;
   frustumLeft: number[];
   frustumRight: number[];
+  renderBoundTop: number[][];
+  renderBoundBottom: number[][];
 };
-
 export const renderFrame = (
   config: RenderConfig,
   ctx: CanvasRenderingContext2D,
   player: Player,
   delta: number
 ) => {
-  const { height: HEIGHT, width: WIDTH, fovRad: FOV_RAD } = config;
+  config.renderBuffer.fill(0); // Reset the render buffer, just for debugging for now, can be removed later for better performancew/
 
-  ctx.fillStyle = "gray";
-  ctx.fillRect(0, 0, WIDTH, HEIGHT);
+  const { height: HEIGHT, width: WIDTH, fovRad: FOV_RAD } = config;
 
   // Build the view frustum
   const cameraVector = [cos(player.yaw), sin(player.yaw)];
-
   const frustumLeft = [
     cos(player.yaw - FOV_RAD / 2),
     sin(player.yaw - FOV_RAD / 2),
   ];
-
   const frustumRight = [
     cos(player.yaw + FOV_RAD / 2),
     sin(player.yaw + FOV_RAD / 2),
   ];
-
   const playerPosition = [player.x, player.y];
-
-  const renderedSectorIds: number[] = [];
-  let renderedPortals = 0;
 
   const portalQueue: Portal[] = [
     {
-      sector: MAP[0], // TODO: Calculate this - possibly cache the last value so we alywas check it first
+      sector: MAP.find((sector) =>
+        isPointInPolygon(sector.vertices, playerPosition)
+      )!, // TODO: Possibly cache the last value so we alywas check it first
       frustumLeft,
       frustumRight,
+      renderBoundTop: [
+        [0, 0],
+        [WIDTH, 0],
+      ],
+      renderBoundBottom: [
+        [0, HEIGHT],
+        [WIDTH, HEIGHT],
+      ],
+      previousSectorId: -1,
     },
   ];
 
+  let renderedPortals = 0;
   while (renderedPortals < MAX_PORTAL_RENDERS && portalQueue.length > 0) {
     const portal = portalQueue.pop()!;
-    renderPortal(config, player, portal, ctx);
+
+    renderPortal(config, player, portal, portalQueue);
     renderedPortals++;
-    renderedSectorIds.push(portal.sector.id);
-    // portal.sector.neighbourIds.forEach((neighbourId) => {
-    //   if (renderedSectorIds.includes(neighbourId)) return;
-    //   const neighbourSector = MAP.find((sector) => sector.id === neighbourId)!;
-    //   const neighbourPortal = {
-    //     sector: neighbourSector,
-    //     frustumLeft: portal.frustumLeft,
-    //     frustumRight: portal.frustumRight,
-    //   };
-    //   portalQueue.push(neighbourPortal);
-    // });
   }
+
+  const imageData = new ImageData(
+    new Uint8ClampedArray(config.renderBuffer.buffer),
+    WIDTH,
+    HEIGHT
+  );
+  ctx.putImageData(imageData, 0, 0); // TODO: Move this up to the top of the render fn
 
   // Mini map for debugging
   ctx.fillStyle = "white";
@@ -112,9 +118,7 @@ export const renderFrame = (
   );
   ctx.stroke();
 
-  for (const sectorId of renderedSectorIds) {
-    const sector = MAP.find((sector) => sector.id === sectorId)!;
-
+  for (const sector of MAP) {
     const walls: number[][][] = [];
     for (const [index, vertex] of sector.vertices.entries()) {
       const prevVertex = sector.vertices[index - 1];
@@ -133,26 +137,24 @@ export const renderFrame = (
     ctx.stroke();
   }
 
-  // ctx.fillStyle = "green";
-  // for (const wallPoint of drawingWallPoints) {
-  //   ctx.fillRect(wallPoint[0] + 48, wallPoint[1] + 48, 4, 4);
-  // }
-  // Mini map for debugging
+  ctx.font = "22px monospace";
+  ctx.fillText(`FPS: ${(1000 / delta).toFixed(1)}`, WIDTH - 160, HEIGHT - 20);
 };
 
 const renderPortal = (
   renderConfig: RenderConfig,
   player: Player,
   portal: Portal,
-  ctx: CanvasRenderingContext2D
+  portalQueue: Portal[] // For adding new portals from render fn, could be done recursively too
 ) => {
   const { frustumLeft, frustumRight, sector } = portal;
-  const { height, width, viewDistance } = renderConfig;
-  const HEIGHT = height;
-  const WIDTH = width;
-  const VIEW_DISTANCE = viewDistance;
-  const ASPECT_RATIO = WIDTH / HEIGHT;
 
+  const { viewDistance, height } = renderConfig;
+  const HEIGHT = height;
+  const width = portal.renderBoundBottom[1][0] - portal.renderBoundBottom[0][0];
+
+  const VIEW_DISTANCE = viewDistance;
+  const ASPECT_RATIO = width / HEIGHT;
   const fov = vectorAngle(portal.frustumLeft, portal.frustumRight);
   const verticalFov = fov / ASPECT_RATIO;
 
@@ -167,9 +169,6 @@ const renderPortal = (
 
   // draw room
   for (const [index, wall] of walls.entries()) {
-    // const wallPortal =
-    //   sector.portalWallsIndices.includes(index) &&
-    //   MAP.find((sector) => sector.id === portal.sector.neighbourIds[0]); // TODO this is retard code
     const [vertexA, vertexB] = wall;
 
     const intersectionLeftFrustum = getLineSegmentIntersection(
@@ -206,7 +205,7 @@ const renderPortal = (
     const [leftWallBottomOffset, leftWallTopOffset] = getWallPointScreenOffsets(
       leftWallPointDistance,
       sector.bottomOffset,
-      sector.height,
+      sector.height + sector.bottomOffset,
       verticalFov,
       player.z,
       HEIGHT
@@ -219,7 +218,7 @@ const renderPortal = (
       getWallPointScreenOffsets(
         rightWallPointDistance,
         sector.bottomOffset,
-        sector.height,
+        sector.height + sector.bottomOffset,
         verticalFov,
         player.z,
         HEIGHT
@@ -237,29 +236,151 @@ const renderPortal = (
 
     const wallAngle = vectorAngle(vertexA, vertexB);
 
-    ctx.fillStyle = `hsl(${wallAngle * 100}, 100%, 50%)`;
-    ctx.strokeStyle = `hsl(${wallAngle * 100}, 100%, 20%)`;
+    const leftWallPointX =
+      portal.renderBoundTop[0][0] + (leftWallPointAngle / fov) * width;
+    const rightWallPointX =
+      portal.renderBoundTop[0][0] + (rightWallPointAngle / fov) * width;
 
-    const leftWallPointX = (leftWallPointAngle / fov) * WIDTH;
-    const rightWallPointX = (rightWallPointAngle / fov) * WIDTH;
+    const portalIndex = portal.sector.portalWallsIndices.indexOf(index);
+    if (portalIndex !== -1) {
+      const nextSector = MAP.find(
+        (sector) => sector.id === portal.sector.neighbourIds[portalIndex]
+      )!;
 
-    // Draw the wall
-    ctx.beginPath();
-    ctx.moveTo(leftWallPointX, leftWallBottomOffset);
-    ctx.lineTo(leftWallPointX, leftWallTopOffset);
-    ctx.lineTo(rightWallPointX, rightWallTopOffset);
-    ctx.lineTo(rightWallPointX, rightWallBottomOffset);
-    ctx.lineTo(leftWallPointX, leftWallBottomOffset);
-    ctx.fill();
-    ctx.stroke();
+      if (nextSector.id === portal.previousSectorId) continue; // Prevent rendering the portal we came from
 
-    ctx.fillStyle = `hsl(0, 0%, ${(sector.bottomOffset + 3) * 10}%)`;
-    ctx.beginPath();
-    ctx.moveTo(leftWallPointX, leftWallBottomOffset);
-    ctx.lineTo(leftWallPointX, HEIGHT);
-    ctx.lineTo(rightWallPointX, HEIGHT);
-    ctx.lineTo(rightWallPointX, rightWallBottomOffset);
-    ctx.moveTo(leftWallPointX, leftWallBottomOffset);
-    ctx.fill();
+      const [portalLeftWallBottomOffset, portalLeftWallTopOffset] =
+        getWallPointScreenOffsets(
+          leftWallPointDistance,
+          nextSector.bottomOffset,
+          nextSector.height + nextSector.bottomOffset,
+          verticalFov,
+          player.z,
+          HEIGHT
+        );
+
+      const [portalRightWallBottomOffset, portalRightWallTopOffset] =
+        getWallPointScreenOffsets(
+          rightWallPointDistance,
+          nextSector.bottomOffset,
+          nextSector.height + nextSector.bottomOffset,
+          verticalFov,
+          player.z,
+          HEIGHT
+        );
+
+      const isLeft =
+        dot(
+          [sin(player.yaw), -cos(player.yaw)],
+          subtract(leftWallPoint, playerPosition)
+        ) > 0;
+
+      // TODO: Clean this shit up, it only generates positive/negative angles from player view angle
+      const portalFrustumLeftAngle =
+        vectorAngle(
+          [cos(player.yaw), sin(player.yaw)],
+          subtract(leftWallPoint, playerPosition)
+        ) * (isLeft ? -1 : 1);
+
+      const isRight =
+        dot(
+          [-sin(player.yaw), cos(player.yaw)],
+          subtract(rightWallPoint, playerPosition)
+        ) > 0;
+
+      const portalFrustumRightAngle =
+        vectorAngle(
+          [cos(player.yaw), sin(player.yaw)],
+          subtract(rightWallPoint, playerPosition)
+        ) * (isRight ? 1 : -1);
+
+      portalQueue.push({
+        sector: nextSector,
+        frustumLeft: [
+          cos(player.yaw + portalFrustumLeftAngle),
+          sin(player.yaw + portalFrustumLeftAngle),
+        ],
+        frustumRight: [
+          cos(player.yaw + portalFrustumRightAngle),
+          sin(player.yaw + portalFrustumRightAngle),
+        ],
+        renderBoundTop: [
+          [
+            leftWallPointX,
+            Math.max(portalLeftWallTopOffset, leftWallTopOffset),
+          ],
+          [
+            rightWallPointX,
+            Math.max(portalRightWallTopOffset, rightWallTopOffset),
+          ],
+        ],
+        renderBoundBottom: [
+          [
+            leftWallPointX,
+            Math.min(portalLeftWallBottomOffset, leftWallBottomOffset),
+          ],
+          [
+            rightWallPointX,
+            Math.min(portalRightWallBottomOffset, rightWallBottomOffset),
+          ],
+        ],
+        previousSectorId: portal.sector.id,
+      });
+    }
+
+    const ceilColorIntensity = 120 + sector.bottomOffset * 10;
+    rasterizeParallelogramInBounds(
+      renderConfig.renderBuffer,
+      [
+        [leftWallPointX, 0],
+        [rightWallPointX, 0],
+      ],
+      [
+        [leftWallPointX, leftWallBottomOffset],
+        [rightWallPointX, rightWallBottomOffset],
+      ],
+
+      portal.renderBoundTop,
+      portal.renderBoundBottom,
+      rgbColor(ceilColorIntensity, ceilColorIntensity, ceilColorIntensity),
+      false
+    );
+
+    rasterizeParallelogramInBounds(
+      renderConfig.renderBuffer,
+      [
+        [leftWallPointX, leftWallTopOffset],
+        [rightWallPointX, rightWallTopOffset],
+      ],
+      [
+        [leftWallPointX, leftWallBottomOffset],
+        [rightWallPointX, rightWallBottomOffset],
+      ],
+      portal.renderBoundTop,
+      portal.renderBoundBottom,
+      rgbColor(
+        255 * (0.5 - wallAngle / (Math.PI / 2)),
+        255 * (0.5 - wallAngle / (Math.PI / 2)),
+        255
+      ),
+      true
+    );
+
+    const floorColorIntensity = 200 + sector.bottomOffset * 10;
+    rasterizeParallelogramInBounds(
+      renderConfig.renderBuffer,
+      [
+        [leftWallPointX, leftWallBottomOffset],
+        [rightWallPointX, rightWallBottomOffset],
+      ],
+      [
+        [leftWallPointX, HEIGHT],
+        [rightWallPointX, HEIGHT],
+      ],
+      portal.renderBoundTop,
+      portal.renderBoundBottom,
+      rgbColor(floorColorIntensity, floorColorIntensity, floorColorIntensity),
+      false
+    );
   }
 };

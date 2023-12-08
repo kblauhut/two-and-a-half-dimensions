@@ -22,14 +22,9 @@ export const toUnit = (vector: number[]) => {
 };
 
 export const vectorAngle = (vectorA: number[], vectorB: number[]) => {
-  // TODO: Check why this only worked on unit vectors
-  // Should work without this otherwise dividing by the norm is dividing by 1 * 1...
-  const vectorAUnit = toUnit(vectorA);
-  const vectorBUnit = toUnit(vectorB);
-
-  const dotProduct = dot(vectorAUnit, vectorBUnit);
-  const normA = Number(norm(vectorAUnit));
-  const normB = Number(norm(vectorBUnit));
+  const dotProduct = dot(vectorA, vectorB);
+  const normA = Number(norm(vectorA));
+  const normB = Number(norm(vectorB));
 
   return Math.acos(minMax(dotProduct / (normA * normB), -1, 1));
 };
