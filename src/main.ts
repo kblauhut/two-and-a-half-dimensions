@@ -29,6 +29,11 @@ const player = new Player();
 // Render loop
 const renderLoop = (prevTime: number, currentTime: number) => {
   const delta = currentTime - prevTime;
+
+  // Trigger player movement every 10 seconds
+  if((player.stoppedMoving || player.isJumping) && (player.currentSpeed > 0 || player.currentSpeed < 0)) {
+    player.surgeStep(0); // or player.surgeStep(-1) for backward movement}
+  }
   renderFrame(renderConfig, ctx, player, delta);
   requestAnimationFrame((time) => renderLoop(currentTime, time));
 };
@@ -37,15 +42,19 @@ const renderLoop = (prevTime: number, currentTime: number) => {
 const eventListener = (e: KeyboardEvent) => {
   switch (e.key) {
     case "w":
+      player.setIsMoving(true);
       player.surgeStep(0.5);
       break;
     case "s":
+      player.setIsMoving(true);
       player.surgeStep(-0.5);
       break;
     case "d":
+      player.setIsMoving(true);
       player.swayStep(0.5);
       break;
     case "a":
+      player.setIsMoving(true);
       player.swayStep(-0.5);
       break;
     case "ArrowLeft":
@@ -60,10 +69,17 @@ const eventListener = (e: KeyboardEvent) => {
     case "ArrowDown":
       player.heaveStep(-0.5);
       break;
+    case " ":
+      player.jump();
+      break;
   }
 };
 
 document.addEventListener("keydown", eventListener);
+document.addEventListener("keyup", () => {
+  player.setIsMoving(false);
+});
+
 
 // Start the render loop
 renderLoop(1, 1);

@@ -1,18 +1,38 @@
 import {calculatePlayerBoundingBox} from "./intersect";
 import {MAP} from './map';
 
-interface Vector2D {
-    x: number;
-    y: number;
+
+class Vector2D {
+    constructor(public x: number, public y: number) {}
+
+    // Function to rotate a vector by a given angle in degrees
+    rotate(angle: number): Vector2D {
+        const radians = (angle * Math.PI) / 180;
+        const cos = Math.cos(radians);
+        const sin = Math.sin(radians);
+
+        const newX = this.x * cos - this.y * sin;
+        const newY = this.x * sin + this.y * cos;
+
+        return new Vector2D(newX, newY);
+    }
 }
 
 export class Player {
-    constructor() {
-    }
+    constructor() {}
 
     private readonly bobbingAmplitude = 0.1;
     private readonly bobbingSpeed = 0.02;
+    private readonly acceleration = 0.1;
+    private readonly deceleration = 0.025;
+    private readonly maxAcceleration = .4;
+    private readonly maxDeacceleration = -.2;
+    private readonly friction =  0.04;
+    private readonly airFriction =  0.00;
+    public isJumping =  false;
+    public currentSpeed = 0;
 
+    public stoppedMoving = false;
     public yaw = 0;
     public x = 0;
     public y = 0;
@@ -22,26 +42,73 @@ export class Player {
         this.yaw += angle;
     }
 
+    public setIsMoving(stoppedMoving: boolean) {
+        this.stoppedMoving = stoppedMoving;
+    }
+
+    public jump() {
+        if (!this.isJumping) {
+            this.isJumping = true;
+
+            const jumpForce = 0.2; // Adjust the jump force as needed
+            const gravity = 0.0005; // Adjust the gravity as needed
+            const jumpDuration = 500; // Adjust the jump duration in milliseconds
+
+            const startTime = Date.now();
+
+            const jumpInterval = setInterval(() => {
+                const currentTime = Date.now();
+                const elapsedTime = currentTime - startTime;
+
+                if (elapsedTime < jumpDuration) {
+                    // Use the quadratic motion equation to calculate the jump height
+                    const jumpHeight = jumpForce * (1 - (elapsedTime / jumpDuration) ** 2) - gravity * elapsedTime;
+
+                    const movementVector = new Vector2D(Math.cos(this.yaw) * this.currentSpeed, Math.sin(this.yaw) * this.currentSpeed)
+                    this.currentSpeed = Math.max(0, this.currentSpeed + this.airFriction);
+
+                    this.updatePosition(movementVector);
+                    // Update player's position in the vertical direction
+                    this.heaveStep(jumpHeight);
+                } else {
+                    clearInterval(jumpInterval);
+                    this.isJumping = false;
+
+                    // Reset the player's vertical position
+                    this.z = 1;
+                }
+            }, 10);
+        }
+    }
+
     public surgeStep(step: number) {
-        const movementVector: Vector2D = {
-            x: Math.cos(this.yaw) * step,
-            y: Math.sin(this.yaw) * step,
-        };
+        if (step > 0) {
+            // Accelerate forward
+            this.currentSpeed = Math.min(this.maxAcceleration, this.currentSpeed + this.acceleration);
+        } else if (step < 0) {
+            // Accelerate backward (decelerate if moving backward)
+            this.currentSpeed = Math.max(this.maxDeacceleration, this.currentSpeed - this.deceleration);
+        } else {
+            // Decelerate when not moving
+            if(this.currentSpeed > 0) {
+                this.currentSpeed = Math.max(0, this.currentSpeed - this.friction)
+            } else if (this.currentSpeed < 0) {
+                this.currentSpeed = Math.min(0, this.currentSpeed + this.friction)
+            }
+        }
+
+        const movementVector = new Vector2D(Math.cos(this.yaw) * this.currentSpeed, Math.sin(this.yaw) * this.currentSpeed)
 
         if (this.canMove(movementVector)) {
             this.updatePosition(movementVector);
 
             // Head bobbing effect
-            this.z = 1 + this.bobbingAmplitude * Math.sin(Date.now() * this.bobbingSpeed);
+            this.z = 1 + this.bobbingAmplitude * Math.sin(Date.now() * this.bobbingSpeed) * .4;
         }
     }
 
     public swayStep(step: number) {
-        const swayDirection: Vector2D = {
-            x: Math.cos(this.yaw + Math.PI / 2) * step,
-            y: Math.sin(this.yaw + Math.PI / 2) * step,
-        };
-
+        const swayDirection = new Vector2D(Math.cos(this.yaw + Math.PI / 2) * step, Math.sin(this.yaw + Math.PI / 2) * step)
         if (this.canMove(swayDirection)) {
             this.updatePosition(swayDirection);
         }
@@ -50,22 +117,6 @@ export class Player {
     public heaveStep(step: number) {
         this.z += step;
     }
-
-    /*
-    private isVertexInsideBoundingBox(vertex: number[], playerBox: {ne: number[], sw: number[], nw: number[], se: number[]}) {
-      const x = vertex[0];
-      const y = vertex[1];
-
-      // Finden Sie die extremen Werte für x und y in der BoundingBox
-      const minX = Math.min(playerBox.nw[0], playerBox.ne[0], playerBox.sw[0], playerBox.se[0]);
-      const maxX = Math.max(playerBox.nw[0], playerBox.ne[0], playerBox.sw[0], playerBox.se[0]);
-      const minY = Math.min(playerBox.nw[1], playerBox.ne[1], playerBox.sw[1], playerBox.se[1]);
-      const maxY = Math.max(playerBox.nw[1], playerBox.ne[1], playerBox.sw[1], playerBox.se[1]);
-
-      // Prüfen, ob der Vertex innerhalb der Grenzen der BoundingBox liegt
-      return x >= minX && x <= maxX && y >= minY && y <= maxY;
-    }*/
-
 
     private doLinesIntersect(line1: { start: number[], end: number[] }, line2: {
         start: number[],
@@ -79,7 +130,6 @@ export class Player {
 
         const lambda = ((line2.end[1] - line2.start[1]) * (line2.end[0] - line1.start[0]) + (line2.start[0] - line2.end[0]) * (line2.end[1] - line1.start[1])) / det;
         const gamma = ((line1.start[1] - line1.end[1]) * (line2.end[0] - line1.start[0]) + (line1.end[0] - line1.start[0]) * (line2.end[1] - line1.start[1])) / det;
-
         return (0 < lambda && lambda < 1) && (0 < gamma && gamma < 1);
     }
 
@@ -91,63 +141,69 @@ export class Player {
         se: number[]
     }) {
         const boxEdges = [
-            {start: playerBox.nw, end: playerBox.ne},
-            {start: playerBox.ne, end: playerBox.se},
-            {start: playerBox.se, end: playerBox.sw},
-            {start: playerBox.sw, end: playerBox.nw}
+            {start: playerBox.nw, end: playerBox.ne, edge: 'left'},
+            {start: playerBox.ne, end: playerBox.se, edge: 'front'},
+            {start: playerBox.se, end: playerBox.sw, edge: 'right'},
+            {start: playerBox.sw, end: playerBox.nw, edge: 'back'}
         ];
 
         const edgeToCheck = {start: startVertex, end: endVertex};
 
+        let linesIntersect = false;
         for (const boxEdge of boxEdges) {
             if (this.doLinesIntersect(edgeToCheck, boxEdge)) {
-                return true;
+                linesIntersect = true;
             }
         }
+        // if left and front move player front right
 
-        return false;
+        return linesIntersect;
     }
 
-    private calculateCollisionPoint(lineStart: number[], lineEnd: number[], playerBox: {
+    private calculateIntersectionPoint(startVertex: number[], endVertex: number[], playerBox: {
         ne: number[],
         sw: number[],
         nw: number[],
         se: number[]
-    }): number[] {
-        const closestPointOnLine = this.closestPointOnLineSegment(lineStart, lineEnd, [this.x, this.y]);
+    }): Vector2D {
+        // Implement the intersection calculation here
+        // You may need to handle different cases based on the edge that intersects
+        // For simplicity, I'll assume the intersection point is the middle of the wall edge
+        const intersectionX = (startVertex[0] + endVertex[0]) / 2;
+        const intersectionY = (startVertex[1] + endVertex[1]) / 2;
 
-        // Ensure the collision point is within the player's bounding box
-        const clampedCollisionPoint = [
-            Math.min(playerBox.sw[0], Math.max(playerBox.se[0], closestPointOnLine[0])),
-            Math.min(playerBox.sw[1], Math.max(playerBox.se[1], closestPointOnLine[1]))
-        ];
-
-        return clampedCollisionPoint;
+        return new Vector2D(intersectionX, intersectionY);
     }
 
-    private closestPointOnLineSegment(lineStart: number[], lineEnd: number[], point: number[]): number[] {
-        const lineDirection = [lineEnd[0] - lineStart[0], lineEnd[1] - lineStart[1]];
-        const lineLength = Math.sqrt(lineDirection[0] ** 2 + lineDirection[1] ** 2);
+    private getAngleToWall(startVertex: number[], endVertex: number[]): number {
+        // Calculate the direction vector of the wall
+        const wallDirection = {
+            x: endVertex[0] - startVertex[0],
+            y: endVertex[1] - startVertex[1],
+        };
 
-        const normalizedLineDirection = [lineDirection[0] / lineLength, lineDirection[1] / lineLength];
+        // Normalize the wall direction vector
+        const normalizedWallDirection = {
+            x: wallDirection.x / Math.sqrt(wallDirection.x * wallDirection.x + wallDirection.y * wallDirection.y),
+            y: wallDirection.y / Math.sqrt(wallDirection.x * wallDirection.x + wallDirection.y * wallDirection.y),
+        };
 
-        const vectorToPoint = [point[0] - lineStart[0], point[1] - lineStart[1]];
-        const distanceAlongLine = vectorToPoint[0] * normalizedLineDirection[0] + vectorToPoint[1] * normalizedLineDirection[1];
+        // Calculate the direction vector of the player's view
+        const viewDirection = {
+            x: Math.cos(this.yaw),
+            y: Math.sin(this.yaw),
+        };
 
-        if (distanceAlongLine < 0) {
-            // Point is before the start of the line
-            return [lineStart[0], lineStart[1]];
-        } else if (distanceAlongLine > lineLength) {
-            // Point is after the end of the line
-            return [lineEnd[0], lineEnd[1]];
-        } else {
-            // Point is within the line segment
-            const closestPoint = [
-                lineStart[0] + normalizedLineDirection[0] * distanceAlongLine,
-                lineStart[1] + normalizedLineDirection[1] * distanceAlongLine
-            ];
-            return closestPoint;
-        }
+        // Calculate the dot product between the player's view direction and the wall direction
+        const dotProduct = normalizedWallDirection.x * viewDirection.x + normalizedWallDirection.y * viewDirection.y;
+
+        // Calculate the angle in radians
+        const angle = Math.acos(dotProduct);
+
+        // Convert the angle to degrees
+        const angleInDegrees = angle * (180 / Math.PI);
+
+        return angleInDegrees;
     }
 
     private canMove(movementVector: Vector2D): boolean {
@@ -155,7 +211,8 @@ export class Player {
         const newY = this.y + movementVector.y;
 
         const playerBox = calculatePlayerBoundingBox([newX, newY], this.yaw);
-        const collisionBox = calculatePlayerBoundingBox([newX, newY], this.yaw, 4.5, 4.5);
+
+        let adjustedMovement = new Vector2D(movementVector.x, movementVector.y); // Initialize with the original movement vector
 
         for (let i = 0; i < MAP[0].vertices.length - 1; i++) {
             const startVertex = MAP[0].vertices[i];
@@ -163,53 +220,23 @@ export class Player {
 
             const isInsidePlayerBox = this.isEdgeInsideBoundingBox(startVertex, endVertex, playerBox);
 
-            if (this.isEdgeInsideBoundingBox(startVertex, endVertex, collisionBox) && !isInsidePlayerBox) {
-                const collisionPoint = this.calculateCollisionPoint(startVertex, endVertex, collisionBox);
-                this.adjustPlayerPosition(collisionPoint);
-                console.log("Player adjusted position due to collision");
-            }
-
             if (isInsidePlayerBox) {
-                return false;
+                const angleToWall = this.getAngleToWall(startVertex, endVertex);
+                // Adjust the movement vector only if the player is too close to the wall
+                const desiredAngle = this.yaw + Math.PI / 4; // 45 degrees to the left
+
+                // Adjust the movement vector based on the rotated wall normal
+                adjustedMovement = movementVector.rotate(angleToWall + 80);
+
+                // Update the player's position with the adjusted movement vector
+                this.updatePosition(adjustedMovement);
+
+                // Break to avoid getting stuck in multiple intersections
             }
         }
-        return true;
+
+        return true; // Player can continue moving
     }
-
-    private adjustPlayerPosition(collisionPoint: number[], smoothingFactor: number = 1, deltaTime: number = 16) {
-        // Calculate the difference between current position and collision point
-        const dx = collisionPoint[0] - this.x;
-        const dy = collisionPoint[1] - this.y;
-
-        // Calculate the perpendicular vector to the wall
-        const perpendicularVector: Vector2D = {
-            x: dy,
-            y: -dx,
-        };
-
-        // Normalize the perpendicular vector
-        const length = Math.sqrt(perpendicularVector.x ** 2 + perpendicularVector.y ** 2);
-        const normalizedPerpendicularVector: Vector2D = {
-            x: perpendicularVector.x / length,
-            y: perpendicularVector.y / length,
-        };
-
-        // Calculate the step to move towards the collision point in parallel to the wall
-        const stepX = normalizedPerpendicularVector.x * smoothingFactor;
-        const stepY = normalizedPerpendicularVector.y * smoothingFactor;
-
-        // Move the player smoothly to maintain a consistent distance from the wall
-        const distanceToMaintain = 0.1; // Adjust this value based on your preference
-
-        const targetX = collisionPoint[0] - normalizedPerpendicularVector.x * (distanceToMaintain + smoothingFactor);
-        const targetY = collisionPoint[1] - normalizedPerpendicularVector.y * (distanceToMaintain + smoothingFactor);
-
-        // Smoothly interpolate the player's position
-        const interpolationFactor = 0.1; // Adjust this value for smoother or faster interpolation
-        this.x += (targetX - this.x) * interpolationFactor;
-        this.y += (targetY - this.y) * interpolationFactor;
-    }
-
     private updatePosition(movementVector: Vector2D) {
         this.x += movementVector.x;
         this.y += movementVector.y;

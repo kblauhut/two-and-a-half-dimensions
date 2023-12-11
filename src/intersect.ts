@@ -47,8 +47,8 @@ export const isLineInFrustum = (
 export const calculatePlayerBoundingBox = (
   playerPosition: number[],
   playerYaw: number,
-  width: number = 2,
-  height: number = 2
+  width: number = 6,
+  height: number = 6
 ) => {
   // Hilfsfunktion, um einen Punkt um einen bestimmten Punkt zu drehen
   function rotatePoint(point: number[], angle: number, center: number[]): number[] {
