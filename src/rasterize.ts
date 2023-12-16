@@ -1,6 +1,5 @@
-import { intersect, max, pi } from "mathjs";
+import { SCREEN_WIDTH } from "./config";
 
-// This only works on little endian machines currently - sorry x86 users
 export const rgbColor = (r: number, g: number, b: number) => {
   const rVal = Math.round(Math.max(Math.min(r, 255), 0)) >>> 0;
   const gVal = (Math.round(Math.max(Math.min(g, 255), 0)) << 8) >>> 0;
@@ -64,7 +63,7 @@ export const rasterizeParallelogramInBounds = (
       y < Math.round(Math.min(parallelogramEndY, boundMaxY));
       y++
     ) {
-      const pixelIndex = x + y * 1400;
+      const pixelIndex = x + y * SCREEN_WIDTH;
 
       renderBuffer[pixelIndex] = color;
 

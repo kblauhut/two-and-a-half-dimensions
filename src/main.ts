@@ -1,37 +1,20 @@
 import { Player } from "./player";
 import { renderFrame } from "./render";
-
-const HEIGHT = 800;
-const WIDTH = 1400;
-const FOV = 90;
-const FOV_RAD = (FOV * Math.PI) / 180;
-const VIEW_DISTANCE = 10000;
-const RENDER_BUFFER = new Uint32Array(WIDTH * HEIGHT);
+import { SCREEN_HEIGHT, SCREEN_WIDTH } from "./config";
 
 const canvas = document.getElementById("render-canvas") as HTMLCanvasElement;
-canvas.width = WIDTH;
-canvas.height = HEIGHT;
+canvas.width = SCREEN_WIDTH;
+canvas.height = SCREEN_HEIGHT;
 
 const ctx = canvas.getContext("2d");
-
-if (!ctx) {
-  throw new Error("Could not get canvas context");
-}
-
-const renderConfig = {
-  height: HEIGHT,
-  width: WIDTH,
-  fovRad: FOV_RAD,
-  viewDistance: VIEW_DISTANCE,
-  renderBuffer: RENDER_BUFFER,
-};
+if (!ctx) throw new Error("Could not get canvas context");
 
 const player = new Player();
 
 // Render loop
 const renderLoop = (prevTime: number, currentTime: number) => {
   const delta = currentTime - prevTime;
-  renderFrame(renderConfig, ctx, player, delta);
+  renderFrame(ctx, player, delta);
   requestAnimationFrame((time) => renderLoop(currentTime, time));
 };
 
