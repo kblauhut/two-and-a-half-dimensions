@@ -1,4 +1,4 @@
-import { distance, dot } from "mathjs";
+import { distance, dot, intersect } from "mathjs";
 
 export const isPointOnLine = (
   lineVectorA: number[],
@@ -10,6 +10,30 @@ export const isPointOnLine = (
   const aToB = Number(distance(lineVectorA, lineVectorB));
 
   return aToPoint + bToPoint - aToB < 0.005;
+};
+
+export const getLineSegmentIntersection = (
+  lineAStart: number[],
+  lineAEnd: number[],
+  lineBStart: number[],
+  lineBEnd: number[]
+) => {
+  const intersectionPoint = intersect(
+    lineAStart,
+    lineAEnd,
+    lineBStart,
+    lineBEnd
+  ) as number[] | null;
+
+  if (!intersectionPoint) return null;
+
+  // We also need to check if the intersection point is on the line segments
+  const isOnLineA = isPointOnLine(lineAStart, lineAEnd, intersectionPoint);
+  const isOnLineB = isPointOnLine(lineBStart, lineBEnd, intersectionPoint);
+
+  if (!isOnLineA || !isOnLineB) return null;
+
+  return intersectionPoint;
 };
 
 // Create perpendicular vectors from the frustum vectors
@@ -86,3 +110,20 @@ export const calculatePlayerBoundingBox = (
 
 
 
+// TODO: Learn how this works https://observablehq.com/@tmcw/understanding-point-in-polygon
+export const isPointInPolygon = (polygon: number[][], point: number[]) => {
+  let inside = false;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const xi = polygon[i][0];
+    const yi = polygon[i][1];
+    const xj = polygon[j][0];
+    const yj = polygon[j][1];
+
+    const intersect =
+      yi > point[1] !== yj > point[1] &&
+      point[0] < ((xj - xi) * (point[1] - yi)) / (yj - yi) + xi;
+    if (intersect) inside = !inside;
+  }
+
+  return inside;
+};
