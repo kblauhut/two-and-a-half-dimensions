@@ -2,11 +2,11 @@ import {calculatePlayerBoundingBox} from "./intersect";
 import {MAP} from './map';
 
 
-class Vector2D {
-    constructor(public x: number, public y: number) {}
+class Vector3D {
+    constructor(public x: number, public y: number, public z: number) {}
 
     // Function to rotate a vector by a given angle in degrees
-    rotate(angle: number): Vector2D {
+    rotate(angle: number): Vector3D {
         const radians = (angle * Math.PI) / 180;
         const cos = Math.cos(radians);
         const sin = Math.sin(radians);
@@ -14,7 +14,17 @@ class Vector2D {
         const newX = this.x * cos - this.y * sin;
         const newY = this.x * sin + this.y * cos;
 
-        return new Vector2D(newX, newY);
+        return new Vector3D(newX, newY, this.z);
+    }
+    add(other: Vector3D): Vector3D {
+        return new Vector3D(this.x + other.x, this.y + other.y, this.z + other.z);
+    }
+}
+class RotationVector3D {
+    constructor(public pitch: number = 0, public yaw: number = 0, public roll: number = 0) {}
+
+    add(other: RotationVector3D): RotationVector3D {
+        return new RotationVector3D(this.pitch + other.pitch, this.yaw + other.yaw, this.roll + other.roll);
     }
 }
 
@@ -23,27 +33,50 @@ export class Player {
 
     private readonly bobbingAmplitude = 0.1;
     private readonly bobbingSpeed = 0.02;
-    private readonly acceleration = 0.1;
-    private readonly deceleration = 0.025;
-    private readonly maxAcceleration = .4;
-    private readonly maxDeacceleration = -.2;
-    private readonly friction =  0.04;
-    private readonly airFriction =  0.00;
+
+
+    private readonly acceleration = 1;
+    private readonly deceleration = 1;
+    private readonly maxVelocity = .1;
+    private readonly minVelocity = -.05;
+
+    private readonly friction =  0.002;
+    private readonly airFriction =  0.00008;
+
+    public currentSpeed =  0;
+
     public isJumping =  false;
-    public currentSpeed = 0;
+    public isMoving = false;
 
-    public stoppedMoving = false;
-    public yaw = 0;
-    public x = 0;
-    public y = 0;
-    public z = 1;
+    public velocity = new Vector3D(0, 0, 0);
+    public position = new Vector3D(0, 0, 1);
+    public rotation = new RotationVector3D(0, 0, 0);
 
-    public yawStep(angle: number) {
-        this.yaw += angle;
+    public setRotation(pitch: number, yaw: number, roll: number) {
+        this.rotation.pitch += pitch;
+        this.rotation.yaw += yaw;
+        this.rotation.roll += roll;
+    }
+    public yawStep(yaw: number) {
+        this.setRotation(0, yaw, 0);
     }
 
-    public setIsMoving(stoppedMoving: boolean) {
-        this.stoppedMoving = stoppedMoving;
+    public setIsMoving(isMoving: boolean) {
+        this.isMoving = isMoving;
+    }
+
+
+    // Methode zur Simulation der Verzögerung und Verringerung der Geschwindigkeit
+    // Methode zur Aktualisierung der Position basierend auf der Geschwindigkeit
+    slowDown(): void {
+        if(!this.isMoving) {
+            this.velocity = new Vector3D(
+                this.velocity.x > 0 ? Math.max(0, this.velocity.x - (this.isJumping ? this.airFriction : this.friction)) : Math.min(0, this.velocity.x + (this.isJumping ? this.airFriction : this.friction)),
+                this.velocity.y > 0 ? Math.max(0, this.velocity.y - (this.isJumping ? this.airFriction : this.friction)) : Math.min(0, this.velocity.y + (this.isJumping ? this.airFriction : this.friction)),
+                Math.max(0, this.velocity.z - 0.25)
+            );
+        }
+        this.position = this.position.add(this.velocity);
     }
 
     public jump() {
@@ -64,10 +97,6 @@ export class Player {
                     // Use the quadratic motion equation to calculate the jump height
                     const jumpHeight = jumpForce * (1 - (elapsedTime / jumpDuration) ** 2) - gravity * elapsedTime;
 
-                    const movementVector = new Vector2D(Math.cos(this.yaw) * this.currentSpeed, Math.sin(this.yaw) * this.currentSpeed)
-                    this.currentSpeed = Math.max(0, this.currentSpeed + this.airFriction);
-
-                    this.updatePosition(movementVector);
                     // Update player's position in the vertical direction
                     this.heaveStep(jumpHeight);
                 } else {
@@ -75,7 +104,7 @@ export class Player {
                     this.isJumping = false;
 
                     // Reset the player's vertical position
-                    this.z = 1;
+                    this.position.z = 1;
                 }
             }, 10);
         }
@@ -84,38 +113,41 @@ export class Player {
     public surgeStep(step: number) {
         if (step > 0) {
             // Accelerate forward
-            this.currentSpeed = Math.min(this.maxAcceleration, this.currentSpeed + this.acceleration);
+            this.currentSpeed = Math.min(this.maxVelocity, this.currentSpeed + this.acceleration) * 0.4;
         } else if (step < 0) {
             // Accelerate backward (decelerate if moving backward)
-            this.currentSpeed = Math.max(this.maxDeacceleration, this.currentSpeed - this.deceleration);
-        } else {
-            // Decelerate when not moving
-            if(this.currentSpeed > 0) {
-                this.currentSpeed = Math.max(0, this.currentSpeed - this.friction)
-            } else if (this.currentSpeed < 0) {
-                this.currentSpeed = Math.min(0, this.currentSpeed + this.friction)
-            }
+            this.currentSpeed = Math.max(this.minVelocity, this.currentSpeed - this.deceleration) * 0.4;
         }
 
-        const movementVector = new Vector2D(Math.cos(this.yaw) * this.currentSpeed, Math.sin(this.yaw) * this.currentSpeed)
+        const movementVector = new Vector3D(Math.cos(this.rotation.yaw) * this.currentSpeed, Math.sin(this.rotation.yaw) * this.currentSpeed, this.velocity.z)
 
         if (this.canMove(movementVector)) {
-            this.updatePosition(movementVector);
-
+            this.velocity = movementVector;
             // Head bobbing effect
-            this.z = 1 + this.bobbingAmplitude * Math.sin(Date.now() * this.bobbingSpeed) * .4;
+            this.position.z = 1 + this.bobbingAmplitude * Math.sin(Date.now() * this.bobbingSpeed) * .4;
         }
     }
 
     public swayStep(step: number) {
-        const swayDirection = new Vector2D(Math.cos(this.yaw + Math.PI / 2) * step, Math.sin(this.yaw + Math.PI / 2) * step)
-        if (this.canMove(swayDirection)) {
-            this.updatePosition(swayDirection);
+        if (step > 0) {
+            // Accelerate forward
+            this.currentSpeed = Math.min(this.maxVelocity, this.currentSpeed + this.acceleration) * 0.4;
+        } else if (step < 0) {
+            // Accelerate backward (decelerate if moving backward)
+            this.currentSpeed = Math.max(this.minVelocity, this.currentSpeed - this.deceleration) * 0.4;
+        }
+
+        const movementVector = new Vector3D(Math.cos(this.rotation.yaw + Math.PI / 2) * this.currentSpeed, Math.sin(this.rotation.yaw + Math.PI / 2) * this.currentSpeed, this.velocity.z)
+
+        if (this.canMove(movementVector)) {
+            this.velocity = movementVector;
+            // Head bobbing effect
+            this.position.z = 1 + this.bobbingAmplitude * Math.sin(Date.now() * this.bobbingSpeed) * .4;
         }
     }
 
     public heaveStep(step: number) {
-        this.z += step;
+        this.position.z += step;
     }
 
     private doLinesIntersect(line1: { start: number[], end: number[] }, line2: {
@@ -160,20 +192,6 @@ export class Player {
         return linesIntersect;
     }
 
-    private calculateIntersectionPoint(startVertex: number[], endVertex: number[], playerBox: {
-        ne: number[],
-        sw: number[],
-        nw: number[],
-        se: number[]
-    }): Vector2D {
-        // Implement the intersection calculation here
-        // You may need to handle different cases based on the edge that intersects
-        // For simplicity, I'll assume the intersection point is the middle of the wall edge
-        const intersectionX = (startVertex[0] + endVertex[0]) / 2;
-        const intersectionY = (startVertex[1] + endVertex[1]) / 2;
-
-        return new Vector2D(intersectionX, intersectionY);
-    }
 
     private getAngleToWall(startVertex: number[], endVertex: number[]): number {
         // Calculate the direction vector of the wall
@@ -190,8 +208,8 @@ export class Player {
 
         // Calculate the direction vector of the player's view
         const viewDirection = {
-            x: Math.cos(this.yaw),
-            y: Math.sin(this.yaw),
+            x: Math.cos(this.rotation.yaw),
+            y: Math.sin(this.rotation.yaw),
         };
 
         // Calculate the dot product between the player's view direction and the wall direction
@@ -206,13 +224,11 @@ export class Player {
         return angleInDegrees;
     }
 
-    private canMove(movementVector: Vector2D): boolean {
-        const newX = this.x + movementVector.x;
-        const newY = this.y + movementVector.y;
+    private canMove(movementVector: Vector3D): boolean {
+        const newX = this.position.x + movementVector.x;
+        const newY = this.position.y + movementVector.y;
 
-        const playerBox = calculatePlayerBoundingBox([newX, newY], this.yaw);
-
-        let adjustedMovement = new Vector2D(movementVector.x, movementVector.y); // Initialize with the original movement vector
+        const playerBox = calculatePlayerBoundingBox([newX, newY], this.rotation.yaw);
 
         for (let i = 0; i < MAP[0].vertices.length - 1; i++) {
             const startVertex = MAP[0].vertices[i];
@@ -223,23 +239,17 @@ export class Player {
             if (isInsidePlayerBox) {
                 const angleToWall = this.getAngleToWall(startVertex, endVertex);
                 // Adjust the movement vector only if the player is too close to the wall
-                const desiredAngle = this.yaw + Math.PI / 4; // 45 degrees to the left
 
+
+                const result = (angleToWall + 90) % 360;
+                const desiredAngle = result < 0 ? result + 360 : result;
                 // Adjust the movement vector based on the rotated wall normal
-                adjustedMovement = movementVector.rotate(angleToWall + 80);
-
-                // Update the player's position with the adjusted movement vector
-                this.updatePosition(adjustedMovement);
-
-                // Break to avoid getting stuck in multiple intersections
+                const rotatedMovement = new Vector3D(movementVector.x * 5, movementVector.y * 5, movementVector.z).rotate(desiredAngle);
+                this.position = this.position.add(rotatedMovement);
             }
         }
 
         return true; // Player can continue moving
-    }
-    private updatePosition(movementVector: Vector2D) {
-        this.x += movementVector.x;
-        this.y += movementVector.y;
     }
 
 }

@@ -31,8 +31,8 @@ const renderLoop = (prevTime: number, currentTime: number) => {
   const delta = currentTime - prevTime;
 
   // Trigger player movement every 10 seconds
-  if((player.stoppedMoving || player.isJumping) && (player.currentSpeed > 0 || player.currentSpeed < 0)) {
-    player.surgeStep(0); // or player.surgeStep(-1) for backward movement}
+  if((player.velocity.x > 0 || player.velocity.x < 0) || (player.velocity.y > 0 || player.velocity.y < 0)) {
+    player.slowDown();
   }
   renderFrame(renderConfig, ctx, player, delta);
   requestAnimationFrame((time) => renderLoop(currentTime, time));

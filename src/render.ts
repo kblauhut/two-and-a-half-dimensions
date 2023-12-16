@@ -32,19 +32,19 @@ export const renderFrame = (
   ctx.fillRect(0, 0, WIDTH, HEIGHT);
 
   // Build the view frustum
-  const cameraVector = [cos(player.yaw), sin(player.yaw)];
+  const cameraVector = [cos(player.rotation.yaw), sin(player.rotation.yaw)];
 
   const frustumLeft = [
-    cos(player.yaw - FOV_RAD / 2),
-    sin(player.yaw - FOV_RAD / 2),
+    cos(player.rotation.yaw - FOV_RAD / 2),
+    sin(player.rotation.yaw - FOV_RAD / 2),
   ];
 
   const frustumRight = [
-    cos(player.yaw + FOV_RAD / 2),
-    sin(player.yaw + FOV_RAD / 2),
+    cos(player.rotation.yaw + FOV_RAD / 2),
+    sin(player.rotation.yaw + FOV_RAD / 2),
   ];
 
-  const playerPosition = [player.x, player.y];
+  const playerPosition = [player.position.x, player.position.y];
   const playerSector = MAP[0]; // TODO: Calculate this - possibly cache the last value so we alywas check it first
 
   const walls: number[][][] = [];
@@ -71,7 +71,7 @@ export const renderFrame = (
 
   // Mini map for debugging
   ctx.fillStyle = "white";
-  ctx.fillRect(player.x + 46, player.y + 46, 4, 4);
+  ctx.fillRect(player.position.x + 46, player.position.y + 46, 4, 4);
   ctx.fillStyle = "red";
   ctx.fillRect(
     add(playerPosition, scaleVector(cameraVector, 40))[0] + 48,
@@ -81,7 +81,7 @@ export const renderFrame = (
   );
   
 
-  const playerBox = calculatePlayerBoundingBox(playerPosition, player.yaw);
+  const playerBox = calculatePlayerBoundingBox(playerPosition, player.rotation.yaw);
   //Bounding Box
   ctx.strokeStyle = 'red';
   ctx.beginPath();
@@ -96,7 +96,7 @@ export const renderFrame = (
   // Draw frustum
   ctx.strokeStyle = "yellow";
   ctx.beginPath();
-  ctx.moveTo(player.x + 48, player.y + 48);
+  ctx.moveTo(player.position.x + 48, player.position.y + 48);
   ctx.lineTo(
     add(playerPosition, scaleVector(frustumLeft, 40))[0] + 48,
     add(playerPosition, scaleVector(frustumLeft, 40))[1] + 48
@@ -105,12 +105,12 @@ export const renderFrame = (
     add(playerPosition, scaleVector(frustumRight, 40))[0] + 48,
     add(playerPosition, scaleVector(frustumRight, 40))[1] + 48
   );
-  ctx.lineTo(player.x + 48, player.y + 48);
+  ctx.lineTo(player.position.x + 48, player.position.y + 48);
   ctx.stroke();
   // Draw camera
   ctx.strokeStyle = "white";
   ctx.beginPath();
-  ctx.moveTo(player.x + 48, player.y + 48);
+  ctx.moveTo(player.position.x + 48, player.position.y + 48);
   ctx.lineTo(
     add(playerPosition, scaleVector(cameraVector, 40))[0] + 48,
     add(playerPosition, scaleVector(cameraVector, 40))[1] + 48
@@ -151,7 +151,7 @@ const renderPortal = (
   const fov = vectorAngle(portal.frustumLeft, portal.frustumRight);
   const verticalFov = fov / ASPECT_RATIO;
 
-  const playerPosition = [player.x, player.y];
+  const playerPosition = [player.position.x, player.position.y];
 
   const walls: number[][][] = [];
   for (const [index, vertex] of sector.vertices.entries()) {
@@ -243,7 +243,7 @@ const renderPortal = (
       sector.bottomOffset,
       sector.height,
       verticalFov,
-      player.z,
+      player.position.z,
       HEIGHT
     );
     const [rightWallBottomOffset, rightWallTopOffset] =
@@ -252,7 +252,7 @@ const renderPortal = (
         sector.bottomOffset,
         sector.height,
         verticalFov,
-        player.z,
+        player.position.z,
         HEIGHT
       );
 
