@@ -1,4 +1,5 @@
 import { distance, dot, intersect } from "mathjs";
+import { MAP } from "./map";
 
 export const isPointOnLine = (
   lineVectorA: number[],
@@ -71,8 +72,8 @@ export const isLineInFrustum = (
 export const calculatePlayerBoundingBox = (
   playerPosition: number[],
   playerYaw: number,
-  width: number = 6,
-  height: number = 6
+  width: number = 3,
+  height: number = 3
 ) => {
   // Hilfsfunktion, um einen Punkt um einen bestimmten Punkt zu drehen
   function rotatePoint(point: number[], angle: number, center: number[]): number[] {
@@ -126,4 +127,61 @@ export const isPointInPolygon = (polygon: number[][], point: number[]) => {
   }
 
   return inside;
+};
+
+export const getWallIntersectionPoint = (
+  sectorId: number,
+  playerPosition: number[],
+  rotationVector: number[]
+): number[] | null => {
+  const sector = MAP.find((sector) => sector.id === sectorId)!;
+
+  for (let i = 1; i < sector.vertices.length; i++) {
+    const vertexA = sector.vertices[i - 1];
+    const vertexB = sector.vertices[i];
+
+    const vertexAPlayer = [
+      vertexA[0] - playerPosition[0],
+      vertexA[1] - playerPosition[1],
+    ];
+    const vertexBPlayer = [
+      vertexB[0] - playerPosition[0],
+      vertexB[1] - playerPosition[1],
+    ];
+
+    const rotationVectorX = rotationVector[0];
+    const rotationVectorY = rotationVector[1];
+    const rotationVectorNormal = [rotationVectorY, -rotationVectorX];
+
+    // Half space tests wall points between the rotation vector
+    const aInNormalDir = dot(rotationVectorNormal, vertexAPlayer) > 0;
+    const bInNormalDir = dot(rotationVectorNormal, vertexBPlayer) > 0;
+
+    // Half space test, wall is in behind the rotation vector
+    const wallBehindRotationVec = dot(vertexAPlayer, rotationVector) < 0;
+
+    if (
+      (aInNormalDir && bInNormalDir) ||
+      (!aInNormalDir && !bInNormalDir) ||
+      wallBehindRotationVec
+    ) {
+      continue;
+    }
+
+    const portalWallIndex = sector.portalWallsIndices.indexOf(i - 1);
+
+    if (portalWallIndex !== -1) {
+      return getWallIntersectionPoint(
+        sector.neighbourIds[portalWallIndex],
+        playerPosition,
+        rotationVector
+      );
+    }
+
+    return intersect([0, 0], rotationVector, vertexAPlayer, vertexBPlayer) as
+      | number[]
+      | null;
+  }
+
+  return null;
 };

@@ -68,8 +68,8 @@ export class Player {
 
     // Methode zur Simulation der Verzögerung und Verringerung der Geschwindigkeit
     // Methode zur Aktualisierung der Position basierend auf der Geschwindigkeit
-    slowDown(): void {
-        if(!this.isMoving) {
+    slowDown(isMoving: boolean): void {
+        if(!isMoving) {
             this.velocity = new Vector3D(
                 this.velocity.x > 0 ? Math.max(0, this.velocity.x - (this.isJumping ? this.airFriction : this.friction)) : Math.min(0, this.velocity.x + (this.isJumping ? this.airFriction : this.friction)),
                 this.velocity.y > 0 ? Math.max(0, this.velocity.y - (this.isJumping ? this.airFriction : this.friction)) : Math.min(0, this.velocity.y + (this.isJumping ? this.airFriction : this.friction)),
@@ -124,7 +124,9 @@ export class Player {
         if (this.canMove(movementVector)) {
             this.velocity = movementVector;
             // Head bobbing effect
-            this.position.z = 1 + this.bobbingAmplitude * Math.sin(Date.now() * this.bobbingSpeed) * .4;
+            if(!this.isJumping) {
+                this.position.z = 1 + this.bobbingAmplitude * Math.sin(Date.now() * this.bobbingSpeed) * .4;
+            }
         }
     }
 
@@ -136,6 +138,17 @@ export class Player {
             // Accelerate backward (decelerate if moving backward)
             this.currentSpeed = Math.max(this.minVelocity, this.currentSpeed - this.deceleration) * 0.4;
         }
+
+        const movementVector = new Vector3D(Math.cos(this.rotation.yaw + Math.PI / 2) * this.currentSpeed, Math.sin(this.rotation.yaw + Math.PI / 2) * this.currentSpeed, this.velocity.z)
+
+        if (this.canMove(movementVector)) {
+            this.velocity = movementVector;
+            // Head bobbing effect
+            this.position.z = 1 + this.bobbingAmplitude * Math.sin(Date.now() * this.bobbingSpeed) * .4;
+        }
+    }
+
+    public update(step: number) {
 
         const movementVector = new Vector3D(Math.cos(this.rotation.yaw + Math.PI / 2) * this.currentSpeed, Math.sin(this.rotation.yaw + Math.PI / 2) * this.currentSpeed, this.velocity.z)
 
@@ -244,7 +257,7 @@ export class Player {
                 const result = (angleToWall + 90) % 360;
                 const desiredAngle = result < 0 ? result + 360 : result;
                 // Adjust the movement vector based on the rotated wall normal
-                const rotatedMovement = new Vector3D(movementVector.x * 5, movementVector.y * 5, movementVector.z).rotate(desiredAngle);
+                const rotatedMovement = new Vector3D(movementVector.x * 2, movementVector.y * 2, movementVector.z).rotate(desiredAngle);
                 this.position = this.position.add(rotatedMovement);
             }
         }
