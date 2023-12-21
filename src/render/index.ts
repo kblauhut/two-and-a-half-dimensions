@@ -5,14 +5,20 @@ import { MAP } from "../map";
 import { SCREEN_HEIGHT, SCREEN_WIDTH, FOV_RAD, RENDER_BUFFER } from "../config";
 import { renderPortal, Portal } from "./portal";
 import { renderMiniMap } from "./miniMap";
+import { Railgun } from "../entities/railgun";
+import { drawCrosshair } from "../crosshair";
 
 const MAX_PORTAL_RENDERS = 32;
+
+let time = 0;
 
 export const renderFrame = (
   ctx: CanvasRenderingContext2D,
   player: Player,
+  railgun: Railgun,
   delta: number
 ) => {
+  time += delta;
   // Build the view frustum
   const frustumLeft = [
     cos(player.yaw - FOV_RAD / 2),
@@ -62,6 +68,16 @@ export const renderFrame = (
     renderedPortals++;
   }
 
+  // Railgun beams
+  railgun.railgunBeams.forEach((rail) => {
+    rail.render(time, player, frustumLeft, frustumRight);
+  });
+
+  // Render Weapon
+  // railgun.renderWeapon(delta);
+
+  drawCrosshair();
+
   const imageData = new ImageData(
     new Uint8ClampedArray(RENDER_BUFFER.buffer),
     SCREEN_WIDTH,
@@ -69,5 +85,5 @@ export const renderFrame = (
   );
   ctx.putImageData(imageData, 0, 0);
 
-  renderMiniMap(ctx, player, delta);
+  // renderMiniMap(ctx, player, delta);
 };

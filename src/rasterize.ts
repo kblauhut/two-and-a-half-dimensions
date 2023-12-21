@@ -79,3 +79,54 @@ export const rasterizeParallelogramInBounds = (
     }
   }
 };
+
+export const rasterizeCircle = (
+  renderBuffer: Uint32Array,
+  xCord: number,
+  yCord: number,
+  radius: number,
+  color: number
+) => {
+  const r2 = radius * radius;
+
+  const startX = Math.round(xCord - radius);
+  const endX = Math.round(xCord + radius);
+
+  for (let x = startX; x < endX; x++) {
+    const centerDeviation = Math.abs(x - xCord);
+    const x2 = centerDeviation ** 2;
+    const circ = Math.sqrt(r2 - x2);
+
+    const ystart = Math.round(yCord - circ);
+    const yend = Math.round(yCord + circ);
+
+    for (let y = ystart; y < yend; y++) {
+      const pixelIndex = x + y * SCREEN_WIDTH;
+
+      renderBuffer[pixelIndex] = color;
+    }
+  }
+};
+
+export const rasterizeRect = (
+  renderBuffer: Uint32Array,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  color: number
+) => {
+  const startX = Math.round(x);
+  const endX = Math.round(x + width);
+
+  const startY = Math.round(y);
+  const endY = Math.round(y + height);
+
+  for (let x = startX; x < endX; x++) {
+    for (let y = startY; y < endY; y++) {
+      const pixelIndex = x + y * SCREEN_WIDTH;
+
+      renderBuffer[pixelIndex] = color;
+    }
+  }
+};

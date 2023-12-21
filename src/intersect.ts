@@ -24,7 +24,7 @@ export const getLineSegmentIntersection = (
     lineAEnd,
     lineBStart,
     lineBEnd
-  ) as number[] | null;
+  ) as [number, number] | null;
 
   if (!intersectionPoint) return null;
 
