@@ -1,16 +1,17 @@
 import { sin, cos } from "mathjs";
 import { Player } from "../player";
-import { isPointInPolygon } from "../intersect";
-import { MAP } from "../map";
 import { SCREEN_HEIGHT, SCREEN_WIDTH, FOV_RAD, RENDER_BUFFER } from "../config";
 import { renderPortal, Portal } from "./portal";
 import { renderMiniMap } from "./miniMap";
 import { Railgun } from "../entities/railgun";
 import { drawCrosshair } from "../crosshair";
+import { Enemy } from "../entities/enemy";
 
 const MAX_PORTAL_RENDERS = 32;
 
 let time = 0;
+
+const enemies = [new Enemy([10, 10])];
 
 export const renderFrame = (
   ctx: CanvasRenderingContext2D,
@@ -29,12 +30,6 @@ export const renderFrame = (
     sin(player.yaw + FOV_RAD / 2),
   ];
 
-  const playerPosition = [player.x, player.y];
-  // Find the sector the player is in
-  const initialSector =
-    MAP.find((sector) => isPointInPolygon(sector.vertices, playerPosition)) ||
-    MAP[0]; // TODO: Possibly cache the last value so we alywas check it first
-
   const initialTopRenderBound = [
     [0, 0],
     [SCREEN_WIDTH, 0],
@@ -45,15 +40,18 @@ export const renderFrame = (
     [SCREEN_WIDTH, SCREEN_HEIGHT],
   ];
 
+  const depthBuffer = new Float32Array(SCREEN_WIDTH).fill(0);
+
   // Set up the portal queue
   const portalQueue: Portal[] = [
     {
-      sector: initialSector,
+      sector: player.currentSector,
       frustumLeft,
       frustumRight,
       renderBoundTop: initialTopRenderBound,
       renderBoundBottom: initialBottomRenderBound,
       previousSectorId: -1,
+      depthBuffer,
     },
   ];
 
@@ -63,14 +61,17 @@ export const renderFrame = (
   let renderedPortals = 0;
   while (renderedPortals < MAX_PORTAL_RENDERS && portalQueue.length > 0) {
     const portal = portalQueue.pop()!;
-
     renderPortal(player, portal, portalQueue);
     renderedPortals++;
   }
 
   // Railgun beams
   railgun.railgunBeams.forEach((rail) => {
-    rail.render(time, player, frustumLeft, frustumRight);
+    rail.render(time, player, frustumLeft, frustumRight, depthBuffer);
+  });
+
+  enemies.forEach((enemy) => {
+    // enemy.render(player, frustumLeft, frustumRight, depthBuffer);
   });
 
   // Render Weapon
@@ -84,6 +85,10 @@ export const renderFrame = (
     SCREEN_HEIGHT
   );
   ctx.putImageData(imageData, 0, 0);
+
+  // for (let i = 0; i < depthBuffer.length; i++) {
+  //   ctx.fillRect(i, depthBuffer[i], 1, 1);
+  // }
 
   // renderMiniMap(ctx, player, delta);
 };

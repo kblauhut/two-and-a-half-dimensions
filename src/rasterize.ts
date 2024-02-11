@@ -130,3 +130,94 @@ export const rasterizeRect = (
     }
   }
 };
+
+export const rasterizeCircleDepthClip = (
+  renderBuffer: Uint32Array,
+  xCord: number,
+  yCord: number,
+  radius: number,
+  color: number,
+  distance: number,
+  depthBuffer: Float32Array
+) => {
+  const r2 = radius * radius;
+
+  const startX = Math.round(xCord - radius);
+  const endX = Math.round(xCord + radius);
+
+  for (let x = startX; x < endX; x++) {
+    const centerDeviation = Math.abs(x - xCord);
+    const x2 = centerDeviation ** 2;
+    const circ = Math.sqrt(r2 - x2);
+
+    const ystart = Math.round(yCord - circ);
+    const yend = Math.round(yCord + circ);
+
+    for (let y = ystart; y < yend; y++) {
+      const pixelIndex = x + y * SCREEN_WIDTH;
+
+      if (depthBuffer[x] < distance) {
+        continue;
+      }
+
+      renderBuffer[pixelIndex] = color;
+    }
+  }
+};
+
+export const rasterizeParallelogramDepthClip = (
+  renderBuffer: Uint32Array,
+  parallelogramTopLine: number[][],
+  parallelogramBottomLine: number[][],
+  color: number,
+  startDistance: number,
+  endDistance: number,
+  depthBuffer: Float32Array
+) => {
+  const xDrawRangeStart = Math.round(parallelogramTopLine[0][0]);
+  const xDrawRangeEnd = Math.round(parallelogramTopLine[1][0]);
+
+  const parallelogramTopLineSlope =
+    (parallelogramTopLine[1][1] - parallelogramTopLine[0][1]) /
+    (parallelogramTopLine[1][0] - parallelogramTopLine[0][0]);
+  const parallelogramBottomLineSlope =
+    (parallelogramBottomLine[1][1] - parallelogramBottomLine[0][1]) /
+    (parallelogramBottomLine[1][0] - parallelogramBottomLine[0][0]);
+
+  const xParallelogramStartOffset =
+    xDrawRangeStart - parallelogramTopLine[0][0];
+
+  let parallelogramStartY =
+    parallelogramTopLine[0][1] +
+    parallelogramTopLineSlope * xParallelogramStartOffset;
+  let parallelogramEndY =
+    parallelogramBottomLine[0][1] +
+    parallelogramBottomLineSlope * xParallelogramStartOffset;
+
+  const pointCount = xDrawRangeEnd - xDrawRangeStart;
+
+  for (let x = xDrawRangeStart; x < xDrawRangeEnd; x++) {
+    parallelogramStartY += parallelogramTopLineSlope;
+    parallelogramEndY += parallelogramBottomLineSlope;
+
+    // https://www.scratchapixel.com/lessons/3d-basic-rendering/rasterization-practical-implementation/visibility-problem-depth-buffer-depth-interpolation.html
+    const lambda = (x - xDrawRangeStart) / pointCount;
+    const z = (1 / startDistance) * (1 - lambda) + (1 / endDistance) * lambda;
+    const zInverse = 1 / z;
+
+    // renderBuffer[x + Math.round(zInverse) * SCREEN_WIDTH] = rgbColor(0, 255, 0); // Debugging
+
+    if (depthBuffer[x] < zInverse) {
+      continue;
+    }
+
+    for (
+      let y = Math.round(Math.max(parallelogramStartY));
+      y < Math.round(Math.min(parallelogramEndY));
+      y++
+    ) {
+      const pixelIndex = x + y * SCREEN_WIDTH;
+      renderBuffer[pixelIndex] = color;
+    }
+  }
+};

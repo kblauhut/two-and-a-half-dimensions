@@ -1,17 +1,12 @@
 import { Player } from "../player";
 import { Sector, MAP } from "../map";
 import { getLineSegmentIntersection } from "../intersect";
-import { subtract, det, distance } from "mathjs";
+import { subtract, det, distance, add } from "mathjs";
+import { SCREEN_WIDTH, RENDER_BUFFER, SCREEN_VERTICAL_FOV } from "../config";
 import {
-  SCREEN_HEIGHT,
-  SCREEN_WIDTH,
-  RENDER_BUFFER,
-  SCREEN_VERTICAL_FOV,
-} from "../config";
-import {
-  rasterizeParallelogramInBounds,
-  rasterizeCircle,
   rgbColor,
+  rasterizeParallelogramDepthClip,
+  rasterizeCircleDepthClip,
 } from "../rasterize";
 import {
   clipLineSegmentWithFrustum,
@@ -19,7 +14,7 @@ import {
   getScreenY,
 } from "../render/util";
 
-const LIFETIME_MS = 1000;
+const LIFETIME_MS = 10000;
 
 export class Rail {
   time: number;
@@ -28,32 +23,35 @@ export class Rail {
   destination: [number, number];
   destinationHeight: number;
 
-  constructor(player: Player, time: number) {
-    const playerSector = MAP[0];
-
+  constructor(private player: Player, time: number) {
     const origin = [
       player.x + Math.cos(player.yaw + 0.1) * 0.5,
       player.y + Math.sin(player.yaw + 0.1) * 0.5,
     ] as [number, number];
 
-    const intersect = intersectWithMap(playerSector, origin, player.yaw);
+    const intersect = intersectWithMap(
+      player.currentSector,
+      origin,
+      player.yaw
+    );
 
     this.time = time;
     this.origin = origin;
     this.destination = intersect || [0, 0];
     this.originHeight = player.z;
-    this.destinationHeight = player.z - 0.6;
+    this.destinationHeight = player.z;
   }
 
   render(
     time: number,
     player: Player,
     frustumLeft: number[],
-    frustumRight: number[]
+    frustumRight: number[],
+    depthBuffer: Float32Array
   ) {
     const delta = time - this.time;
     if (delta > LIFETIME_MS) return;
-    const animationValue = delta / LIFETIME_MS;
+    const animationValue = 1 - delta / LIFETIME_MS;
 
     const playerPosition = [player.x, player.y];
 
@@ -116,7 +114,8 @@ export class Rail {
     );
 
     const color = rgbColor(255 * animationValue, 255, 255 * animationValue);
-    rasterizeParallelogramInBounds(
+
+    rasterizeParallelogramDepthClip(
       RENDER_BUFFER,
       [
         [lX, lTopY],
@@ -126,16 +125,10 @@ export class Rail {
         [lX, lBottomY],
         [rX, rBottomY],
       ],
-      [
-        [0, 0],
-        [SCREEN_WIDTH, 0],
-      ],
-      [
-        [0, SCREEN_HEIGHT],
-        [SCREEN_WIDTH, SCREEN_HEIGHT],
-      ],
       color,
-      false
+      distance(playerPosition, originClipped) as number,
+      distance(playerPosition, destinationClipped) as number,
+      depthBuffer
     );
 
     const destX = getScreenX(
@@ -146,21 +139,38 @@ export class Rail {
       SCREEN_WIDTH
     );
 
-    const destY = getScreenY(
+    const destY1 = getScreenY(
       playerPosition,
       this.destination,
       this.destinationHeight - player.z,
       SCREEN_VERTICAL_FOV
     );
 
-    const dist = distance(playerPosition, this.destination) as number;
+    const destY2 = getScreenY(
+      playerPosition,
+      this.destination,
+      this.destinationHeight - animationValue / 2 - player.z,
+      SCREEN_VERTICAL_FOV
+    );
 
-    rasterizeCircle(
+    const circleDistance = distance(playerPosition, this.destination) as number;
+    const circleColor = rgbColor(
+      200 * animationValue,
+      230,
+      200 * animationValue
+    );
+
+    const baseRadius = Math.abs(destY1 - destY2);
+    const animatedRadius = baseRadius * (1 - animationValue);
+
+    rasterizeCircleDepthClip(
       RENDER_BUFFER,
       destX,
-      lTopY,
-      (100 * animationValue) / (dist / 10),
-      color
+      (destY1 + destY2) / 2,
+      animatedRadius,
+      circleColor,
+      circleDistance - 2,
+      depthBuffer
     );
   }
 }

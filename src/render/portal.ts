@@ -2,7 +2,7 @@ import { Player } from "../player";
 import { vectorAngle } from "../math";
 import { Sector, MAP } from "../map";
 import { clipLineSegmentWithFrustum, getScreenX, getScreenY } from "./util";
-import { sin, cos, subtract, dot } from "mathjs";
+import { sin, cos, subtract, distance } from "mathjs";
 import { rasterizeParallelogramInBounds, rgbColor } from "../rasterize";
 import { SCREEN_HEIGHT, RENDER_BUFFER } from "../config";
 
@@ -13,6 +13,7 @@ export type Portal = {
   frustumRight: number[];
   renderBoundTop: number[][];
   renderBoundBottom: number[][];
+  depthBuffer: Float32Array;
 };
 
 export const renderPortal = (
@@ -109,6 +110,21 @@ export const renderPortal = (
     );
 
     const portalIndex = sector.portalWallsIndices.indexOf(index);
+
+    if (portalIndex === -1) {
+      const pointCount = rX - lX;
+      const leftDist = distance(playerPosition, leftWallPoint) as number;
+      const rightDist = distance(playerPosition, rightWallPoint) as number;
+      for (let i = 0; i < pointCount; i++) {
+        // https://www.scratchapixel.com/lessons/3d-basic-rendering/rasterization-practical-implementation/visibility-problem-depth-buffer-depth-interpolation.html
+        const lambda = i / pointCount;
+        const z = (1 / leftDist) * (1 - lambda) + (1 / rightDist) * lambda;
+        const zInverse = 1 / z;
+
+        portal.depthBuffer[Math.round(lX + i)] = zInverse;
+      }
+    }
+
     if (portalIndex !== -1) {
       const nextSector = MAP.find(
         (sec) => sec.id === sector.neighbourIds[portalIndex]
@@ -171,6 +187,7 @@ export const renderPortal = (
           [rX, Math.min(rBottomYPortal, rBottomY)],
         ],
         previousSectorId: sector.id,
+        depthBuffer: portal.depthBuffer,
       });
     }
 
